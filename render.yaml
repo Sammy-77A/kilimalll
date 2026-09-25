@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: kilimalll
+    env: node
+    plan: free
+    region: frankfurt
+    buildCommand: "pnpm install"
+    startCommand: "pnpm start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: BASE_URL
+        value: https://kilimalll.onrender.com
