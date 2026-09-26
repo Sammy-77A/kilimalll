@@ -8,10 +8,6 @@
     "dev": "node --watch server/index.js",
     "migrate": "node server/db/migrate.js"
   },
-  "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
-  },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1140.0",
     "compression": "^1.7.4",

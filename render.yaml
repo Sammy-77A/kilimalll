@@ -4,8 +4,8 @@ services:
     env: node
     plan: free
     region: frankfurt
-    buildCommand: "pnpm install"
-    startCommand: "pnpm start"
+    buildCommand: "npm install"
+    startCommand: "node server/index.js"
     envVars:
       - key: NODE_ENV
         value: production
