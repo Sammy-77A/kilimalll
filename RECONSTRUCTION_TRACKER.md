@@ -283,10 +283,13 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 | Test | Endpoint / Scope | Environment | Result |
 |------|------------------|-------------|--------|
 | API Health Endpoint | `GET https://kilimalll.onrender.com/api/health` | Render (Production) | ✅ HTTP 200 `{"status":"ok","db":"connected",...}` |
-| Production Homepage | `GET https://kilimalll.onrender.com/` | Render (Production) | ✅ HTTP 200 (serves `index.html`) |
-| App Download Page | `GET https://kilimalll.onrender.com/download` | Render (Production) | ✅ HTTP 200 (serves `downloadApp.html`) |
-| Sitemap Page | `GET https://kilimalll.onrender.com/sitemap` | Render (Production) | ✅ HTTP 200 (serves `sitemap.html`) |
+| Production Homepage | `GET https://kilimalll.onrender.com/` | Render (Production) | ✅ HTTP 200 (`display:none` on loading overlay) |
+| App Download Page | `GET https://kilimalll.onrender.com/download` | Render (Production) | ✅ HTTP 200 (overlay hidden with `display:none`) |
+| Sitemap Page | `GET https://kilimalll.onrender.com/sitemap` | Render (Production) | ✅ HTTP 200 (overlay hidden with `display:none`) |
 | DB Connectivity & Migration | Neon PostgreSQL (`delicate-brook-62175600`) | Frankfurt DB | ✅ Migration table & `001_bootstrap.sql` verified |
+
+#### Recent Deployments & Fixes
+- **Commit `086a6e6` / Deploy `dep-dau2um0u01pc7380prb0`**: Removed blocking `.router-jump-animation` loading overlay on `sitemap.html` and `downloadApp.html` static pages by setting `display:none;` on initial DOM mount. Updated `pnpm-lock.yaml` for Render build process. Status: **LIVE**.
 
 #### Known Limitations / Notes
 
@@ -309,10 +312,10 @@ Please perform the following verification steps on the live Render environment:
 - Open [https://kilimalll.onrender.com/](https://kilimalll.onrender.com/)
 - Expected: Kilimall homepage renders cleanly without loading spinners blocking navigation.
 
-**3. Verify Static Landing Pages**
+**3. Verify Static Landing Pages (Sitemap & App Download)**
 - Open [https://kilimalll.onrender.com/download](https://kilimalll.onrender.com/download)
 - Open [https://kilimalll.onrender.com/sitemap](https://kilimalll.onrender.com/sitemap)
-- Expected: Respective HTML views serve properly under SPA routing.
+- Expected: Both pages load immediately and completely cleanly, with zero blocking overlays or spinners.
 
 #### User Verification Result
 *(Awaiting your confirmation)*
