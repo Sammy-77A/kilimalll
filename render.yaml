@@ -4,12 +4,56 @@ services:
     env: node
     plan: free
     region: frankfurt
-    buildCommand: "npm install"
+    buildCommand: "pnpm install --frozen-lockfile"
     startCommand: "node server/index.js"
+    healthCheckPath: /api/health
     envVars:
+      # Core
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        sync: false
       - key: BASE_URL
         value: https://kilimalll.onrender.com
+      - key: ALLOWED_ORIGIN
+        value: https://kilimalll.onrender.com
+
+      # Database (Neon) — set in Render dashboard, not committed here
+      - key: DATABASE_URL
+        sync: false
+
+      # JWT Auth — set in Render dashboard
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+
+      # Cloudflare R2 — set in Render dashboard
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET
+        value: kilimalll
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+
+      # Email (Resend) — set in Render dashboard
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+      # Payments (PayHero) — set in Render dashboard
+      - key: PAYHERO_API_KEY
+        sync: false
+      - key: PAYHERO_USERNAME
+        sync: false
+      - key: PAYHERO_PASSWORD
+        sync: false
+      - key: PAYHERO_CALLBACK_URL
+        value: https://kilimalll.onrender.com/api/payments/webhook
