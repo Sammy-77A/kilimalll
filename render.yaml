@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     region: frankfurt
-    buildCommand: "npm install"
+    buildCommand: "npm install --no-package-lock"
     startCommand: "node server/index.js"
     healthCheckPath: /api/health
     envVars:
