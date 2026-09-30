@@ -111,14 +111,14 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 7 — Order & Checkout API
-**Status:** `NOT STARTED`
+**Status:** `AWAITING USER VERIFICATION`
 
-- [ ] 7.1 — `POST /api/orders`
-- [ ] 7.2 — `GET /api/orders`
-- [ ] 7.3 — `GET /api/orders/:id`
-- [ ] 7.4 — `PATCH /api/orders/:id/cancel`
-- [ ] 7.5 — Atomic stock decrement (transaction)
-- [ ] 7.6 — Integration tests
+- [x] 7.1 — `POST /api/orders`
+- [x] 7.2 — `GET /api/orders`
+- [x] 7.3 — `GET /api/orders/:id`
+- [x] 7.4 — `PATCH /api/orders/:id/cancel`
+- [x] 7.5 — Atomic stock decrement (transaction)
+- [x] 7.6 — Integration tests
 
 ---
 
