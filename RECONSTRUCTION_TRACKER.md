@@ -76,7 +76,7 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 4 — Product Catalog API
-**Status:** `AWAITING USER VERIFICATION`
+**Status:** `APPROVED`
 
 - [x] 4.1 — `GET /api/categories`
 - [x] 4.2 — `GET /api/products` (list, filter, sort, paginate)
@@ -88,13 +88,13 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 5 — Homepage & CMS Content API
-**Status:** `NOT STARTED`
+**Status:** `AWAITING USER VERIFICATION`
 
-- [ ] 5.1 — `GET /api/banners`
-- [ ] 5.2 — `GET /api/flash-sales`
-- [ ] 5.3 — `GET /api/search-keywords/hot`
-- [ ] 5.4 — `GET /api/products/featured`
-- [ ] 5.5 — Integration tests
+- [x] 5.1 — `GET /api/banners` (active banners with type filtering)
+- [x] 5.2 — `GET /api/flash-sales` (active flash deals with product details)
+- [x] 5.3 — `GET /api/search-keywords/hot` (top hot search bar suggestions)
+- [x] 5.4 — `GET /api/products/featured` (featured homepage best sellers & top rated)
+- [x] 5.5 — Integration tests: banners, flash sales, hot keywords, featured products
 
 ---
 
@@ -392,9 +392,9 @@ Please perform the following verification steps on the live Render environment:
 
 | Field | Value |
 |-------|-------|
-| Status | `AWAITING USER VERIFICATION` |
+| Status | `APPROVED` |
 | Start Date | 2026-10-01 |
-| Approval Date | — |
+| Approval Date | 2026-10-01 |
 | GitHub Branch | `main` |
 | GitHub Commit SHA | `f714aed` |
 | Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
@@ -411,6 +411,26 @@ Please perform the following verification steps on the live Render environment:
 - `GET https://kilimalll.onrender.com/api/products?limit=2`: Returns HTTP 200 with paginated product catalog.
 - `GET https://kilimalll.onrender.com/api/products/1`: Returns HTTP 200 with product details, image gallery, SKUs, and active flash sale info.
 - `GET https://kilimalll.onrender.com/api/search?q=Infinix`: Returns HTTP 200 with matching search results.
+
+---
+
+### Phase 5 — Homepage & CMS Content API
+
+| Field | Value |
+|-------|-------|
+| Status | `AWAITING USER VERIFICATION` |
+| Start Date | 2026-10-01 |
+| Approval Date | — |
+| GitHub Branch | `main` |
+| GitHub Commit SHA | Pending deployment |
+| Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
+| Deployment URL | `https://kilimalll.onrender.com` |
+
+#### Files Changed
+- `server/routes/cms.js`: Created endpoints `/api/banners`, `/api/flash-sales`, `/api/search-keywords/hot`, and `/api/products/featured`.
+- `server/index.js`: Mounted `/api` CMS routes before product routes.
+- `server/tests/cms.test.js`: Created integration tests for banner filtering, active flash sales, hot keywords, and featured products.
+- `vitest.config.js`: Added `fileParallelism: false` to ensure clean sequential test execution across DB tests.
 
 ---
 

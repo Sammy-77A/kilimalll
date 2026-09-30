@@ -40,6 +40,7 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // ── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api', require('./routes/health'));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api', require('./routes/cms'));
 app.use('/api', require('./routes/products'));
 // Future route mounts added here as phases complete:
 // app.use('/api/cart',     require('./routes/cart'));
