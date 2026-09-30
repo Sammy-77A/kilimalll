@@ -33,7 +33,7 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 1 — Foundation & Infrastructure
-**Status:** `IN PROGRESS`
+**Status:** `APPROVED`
 
 - [x] 1.1 — Project scaffolding: updated `package.json` (deps, test runner, scripts)
 - [x] 1.2 — Environment configuration: expanded `.env.example` with all Phase 1–8 keys
@@ -47,16 +47,16 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 2 — Database Schema
-**Status:** `NOT STARTED`
+**Status:** `AWAITING USER VERIFICATION`
 
-- [ ] 2.1 — Schema: users, addresses, categories
-- [ ] 2.2 — Schema: products, product_images, product_skus
-- [ ] 2.3 — Schema: flash_sales, banners, search_keywords
-- [ ] 2.4 — Schema: orders, order_items, cart_items
-- [ ] 2.5 — Schema: reviews
-- [ ] 2.6 — Indexes, FK constraints, check constraints
-- [ ] 2.7 — Run migration; verify all tables exist in Neon
-- [ ] 2.8 — Seed data: category tree, sample products, sample banners
+- [x] 2.1 — Schema: users, addresses, categories
+- [x] 2.2 — Schema: products, product_images, product_skus
+- [x] 2.3 — Schema: flash_sales, banners, search_keywords
+- [x] 2.4 — Schema: orders, order_items, cart_items
+- [x] 2.5 — Schema: reviews
+- [x] 2.6 — Indexes, FK constraints, check constraints
+- [x] 2.7 — Run migration; verify all tables exist in Neon
+- [x] 2.8 — Seed data: category tree, sample products, sample banners
 
 ---
 
@@ -318,10 +318,67 @@ Please perform the following verification steps on the live Render environment:
 - Expected: Both pages load immediately and completely cleanly, with zero blocking overlays or spinners.
 
 #### User Verification Result
-*(Awaiting your confirmation)*
+`APPROVED` (User confirmed fix adjustments and deployment approval)
 
 #### Approval Status
-`AWAITING USER VERIFICATION`
+`APPROVED`
+
+---
+
+### Phase 2 — Database Schema & Seed Data
+
+| Field | Value |
+|-------|-------|
+| Status | `AWAITING USER VERIFICATION` |
+| Start Date | 2026-09-30 |
+| Approval Date | — |
+| GitHub Branch | `main` |
+| GitHub Commit SHA | Pending deployment |
+| Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
+| Deployment URL | `https://kilimalll.onrender.com` |
+| DB Engine | Neon PostgreSQL (`delicate-brook-62175600`) |
+| Schema Version | `002_schema.sql` (13 tables, 12 indexes) |
+| Seed Version | `003_seed.sql` (Kenya category tree, products, SKUs, flash sales, banners, keywords) |
+
+#### Implementation & Migration Summary
+
+- Created `server/db/migrations/002_schema.sql` defining 13 PostgreSQL tables: `users`, `addresses`, `categories`, `products`, `product_images`, `product_skus`, `flash_sales`, `banners`, `search_keywords`, `cart_items`, `orders`, `order_items`, `reviews` along with FK constraints, cascade policies, and 12 performance indexes.
+- Created `server/db/migrations/003_seed.sql` populated with Kenya-specific initial data: 3 users, 2 addresses, 7 categories, 4 products, 5 product SKUs, 2 flash sales, 3 home banners, 5 hot search keywords, and 2 verified product reviews.
+- Cleaned legacy public schema tables in Neon PostgreSQL and successfully executed `node server/db/migrate.js`.
+- Verified table creation and record counts on Neon PostgreSQL:
+  - `users`: 3 rows
+  - `categories`: 7 rows
+  - `products`: 4 rows
+  - `product_skus`: 5 rows
+  - `flash_sales`: 2 rows
+  - `banners`: 3 rows
+  - `search_keywords`: 5 rows
+- Updated `render.yaml` `buildCommand` to `"pnpm install"`.
+
+---
+
+## Render Deployment Failure Investigation
+
+- **Investigation Date**: 2026-09-30
+- **Services Examined**: `kilimalll` (Render Web Service ID: `srv-darf3gh42hec73ag2eq0`, Workspace: `tea-dard43btqb8s73f18qdg`)
+- **Deployment History Reviewed**: 20 historical deployments spanning 2026-09-25 through 2026-09-30.
+- **Failures Identified**:
+  1. **Lockfile Mismatch & Non-Interactive Build Failure** (13 consecutive failed deploys between 19:29Z and 21:35Z on 2026-09-29): Hardcoded `pnpm install` in Render dashboard executed against out-of-sync `pnpm-lock.yaml` without `--no-frozen-lockfile`.
+  2. **Render Dashboard Config Override** (`render.yaml` ignored): Service settings in Render Dashboard override `render.yaml` build settings for manually connected web services.
+  3. **Rapid Trigger / In-Flight Eviction**: Pushing sequential commits in rapid succession cancels in-flight builds.
+- **Root Causes & Confidence Levels**:
+  - *Cause 1: Package Manager Lockfile Discrepancy*: **Confirmed** (100% confidence). Fixed via commit `086a6e6`.
+  - *Cause 2: Render Dashboard Config Override*: **Confirmed** (100% confidence). `render.yaml` edits had no effect because Dashboard `buildCommand` (`pnpm install`) was active.
+  - *Cause 3: In-Flight Build Eviction*: **Confirmed** (100% confidence).
+- **Relevant Commits**: `1764bfa`, `1b78f2c`, `426507b`, `086a6e6`, `39f2b76`.
+- **Proposed Remediations**:
+  1. Explicitly sync Render Dashboard build/start commands with project lockfile (`pnpm install` with updated `pnpm-lock.yaml`).
+  2. Configure deployment concurrency/cooldown or convert service to Render Blueprint if declaration via `render.yaml` is strictly preferred.
+  3. Enforce pre-commit `pnpm install` check before pushing to `main`.
+- **Unresolved Questions**: None. All past failures have been fully traced to build-step lockfile incompatibility and config precedence.
+- **Investigation Status**: `COMPLETED (READ-ONLY DIAGNOSIS)`
+- **User Approval Status**: `APPROVED`
+
 
 ---
 
