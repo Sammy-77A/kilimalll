@@ -88,7 +88,7 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 5 — Homepage & CMS Content API
-**Status:** `AWAITING USER VERIFICATION`
+**Status:** `APPROVED`
 
 - [x] 5.1 — `GET /api/banners` (active banners with type filtering)
 - [x] 5.2 — `GET /api/flash-sales` (active flash deals with product details)
@@ -99,14 +99,14 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 6 — Cart API
-**Status:** `NOT STARTED`
+**Status:** `AWAITING USER VERIFICATION`
 
-- [ ] 6.1 — `GET /api/cart`
-- [ ] 6.2 — `POST /api/cart/items`
-- [ ] 6.3 — `PUT /api/cart/items/:id`
-- [ ] 6.4 — `DELETE /api/cart/items/:id`
-- [ ] 6.5 — `POST /api/cart/merge`
-- [ ] 6.6 — Integration tests
+- [x] 6.1 — `GET /api/cart` (fetch user cart with product/SKU pricing and subtotal)
+- [x] 6.2 — `POST /api/cart/items` (add item or increment quantity)
+- [x] 6.3 — `PUT /api/cart/items/:id` (update item quantity)
+- [x] 6.4 — `DELETE /api/cart/items/:id` (remove item from cart)
+- [x] 6.5 — `POST /api/cart/merge` (merge guest local cart on login)
+- [x] 6.6 — Integration tests: auth protection, CRUD operations, cart merge
 
 ---
 

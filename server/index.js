@@ -42,9 +42,8 @@ app.use('/api', require('./routes/health'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/cms'));
 app.use('/api', require('./routes/products'));
+app.use('/api', require('./routes/cart'));
 // Future route mounts added here as phases complete:
-// app.use('/api/cart',     require('./routes/cart'));
-// app.use('/api/cart',     require('./routes/cart'));
 // app.use('/api/orders',   require('./routes/orders'));
 // app.use('/api/payments', require('./routes/payments'));
 
