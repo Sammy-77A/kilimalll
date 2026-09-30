@@ -44,8 +44,7 @@ app.use('/api', require('./routes/cms'));
 app.use('/api', require('./routes/products'));
 app.use('/api', require('./routes/cart'));
 app.use('/api', require('./routes/orders'));
-// Future route mounts added here as phases complete:
-// app.use('/api/payments', require('./routes/payments'));
+app.use('/api', require('./routes/payments'));
 
 // ── Static Assets (content-addressed — cache aggressively) ───────────────────
 app.use('/css',     express.static(path.join(PUBLIC_DIR, 'css'),     { maxAge: '30d', immutable: true }));

@@ -123,15 +123,15 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 8 — Payment Integration (PayHero / M-Pesa)
-**Status:** `NOT STARTED`
+**Status:** `AWAITING USER VERIFICATION`
 
-- [ ] 8.1 — Review PayHero Node.js SDK / REST approach
-- [ ] 8.2 — `POST /api/payments/initiate` (STK push)
-- [ ] 8.3 — `POST /api/payments/webhook`
-- [ ] 8.4 — Webhook signature verification
-- [ ] 8.5 — Order status transitions
-- [ ] 8.6 — Verify "PayHero" never appears in frontend
-- [ ] 8.7 — Sandbox tests
+- [x] 8.1 — Review PayHero Node.js SDK / REST approach
+- [x] 8.2 — `POST /api/payments/initiate` (STK push)
+- [x] 8.3 — `POST /api/payments/webhook`
+- [x] 8.4 — Webhook signature verification
+- [x] 8.5 — Order status transitions
+- [x] 8.6 — Verify "PayHero" never appears in frontend
+- [x] 8.7 — Sandbox tests
 
 ---
 
