@@ -396,7 +396,7 @@ Please perform the following verification steps on the live Render environment:
 | Start Date | 2026-10-01 |
 | Approval Date | — |
 | GitHub Branch | `main` |
-| GitHub Commit SHA | Pending deployment |
+| GitHub Commit SHA | `f714aed` |
 | Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
 | Deployment URL | `https://kilimalll.onrender.com` |
 
@@ -404,6 +404,13 @@ Please perform the following verification steps on the live Render environment:
 - `server/routes/products.js`: Implemented `/api/categories`, `/api/products`, `/api/products/:id`, and `/api/search` routes with pagination, filtering, and sorting.
 - `server/index.js`: Mounted `/api` product routes.
 - `server/tests/products.test.js`: Created integration tests for categories tree, product filtering/sorting, detail fetching, and product search.
+
+#### Live Verification Summary
+- Deployed commit `f714aed` to Render.
+- `GET https://kilimalll.onrender.com/api/categories`: Returns HTTP 200 with hierarchical top-level categories & subcategories.
+- `GET https://kilimalll.onrender.com/api/products?limit=2`: Returns HTTP 200 with paginated product catalog.
+- `GET https://kilimalll.onrender.com/api/products/1`: Returns HTTP 200 with product details, image gallery, SKUs, and active flash sale info.
+- `GET https://kilimalll.onrender.com/api/search?q=Infinix`: Returns HTTP 200 with matching search results.
 
 ---
 
