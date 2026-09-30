@@ -422,7 +422,7 @@ Please perform the following verification steps on the live Render environment:
 | Start Date | 2026-10-01 |
 | Approval Date | — |
 | GitHub Branch | `main` |
-| GitHub Commit SHA | Pending deployment |
+| GitHub Commit SHA | `1b5e167` |
 | Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
 | Deployment URL | `https://kilimalll.onrender.com` |
 
@@ -431,6 +431,14 @@ Please perform the following verification steps on the live Render environment:
 - `server/index.js`: Mounted `/api` CMS routes before product routes.
 - `server/tests/cms.test.js`: Created integration tests for banner filtering, active flash sales, hot keywords, and featured products.
 - `vitest.config.js`: Added `fileParallelism: false` to ensure clean sequential test execution across DB tests.
+
+#### Live Verification Summary
+- Deployed commit `1b5e167` to Render.
+- `GET https://kilimalll.onrender.com/api/banners`: Returns HTTP 200 with active banner slides and target links.
+- `GET https://kilimalll.onrender.com/api/banners?type=home_top`: Returns HTTP 200 filtered top banners.
+- `GET https://kilimalll.onrender.com/api/flash-sales`: Returns HTTP 200 active promotional flash deals with original prices and variant spec names.
+- `GET https://kilimalll.onrender.com/api/search-keywords/hot`: Returns HTTP 200 top hot search keywords with search counters.
+- `GET https://kilimalll.onrender.com/api/products/featured`: Returns HTTP 200 featured homepage products sorted by sales volume and rating score.
 
 ---
 
