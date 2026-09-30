@@ -4,6 +4,34 @@ const pool = require('../db/pool');
 const { authenticate } = require('../middleware/auth');
 const { z } = require('zod');
 
+// ── PayHero SDK ───────────────────────────────────────────────────────────────
+// payhero-devkit is an ES Module, so we use a lazy dynamic import wrapper
+// that resolves on first use and is cached for subsequent calls.
+let _payheroClient = null;
+
+async function getPayHeroClient() {
+  if (_payheroClient) return _payheroClient;
+
+  const payheroUsername = process.env.PAYHERO_USERNAME;
+  const payheroPassword = process.env.PAYHERO_PASSWORD;
+
+  // Credentials not configured — return null to fall back to sandbox mode
+  if (!payheroUsername || !payheroPassword ||
+      payheroPassword === 'replace_with_payhero_password') {
+    return null;
+  }
+
+  try {
+    const { PayHeroClient } = await import('payhero-devkit');
+    const authToken = 'Basic ' + Buffer.from(`${payheroUsername}:${payheroPassword}`).toString('base64');
+    _payheroClient = new PayHeroClient({ authToken });
+    return _payheroClient;
+  } catch (err) {
+    console.error('Failed to initialise PayHeroClient:', err.message);
+    return null;
+  }
+}
+
 // ── Helper: Format Kenyan Phone Number to 254XXXXXXXXX ───────────────────────
 function formatKenyanPhone(phone) {
   let cleaned = phone.replace(/\D/g, '');
@@ -21,7 +49,7 @@ const initiatePaymentSchema = z.object({
   phone_number: z.string().min(9, 'Phone number must be at least 9 digits'),
 });
 
-// ── POST /api/payments/initiate (M-Pesa STK Push) ───────────────────────────
+// ── POST /api/payments/initiate (M-Pesa STK Push) ────────────────────────────
 router.post('/payments/initiate', authenticate, async (req, res, next) => {
   try {
     const validated = initiatePaymentSchema.parse(req.body);
@@ -48,56 +76,45 @@ router.post('/payments/initiate', authenticate, async (req, res, next) => {
       return res.status(400).json({ error: 'Cannot initiate payment for a cancelled order' });
     }
 
-    const payheroApiKey = process.env.PAYHERO_API_KEY;
-    const payheroUsername = process.env.PAYHERO_USERNAME;
-    const payheroPassword = process.env.PAYHERO_PASSWORD;
-    const callbackUrl = process.env.PAYHERO_CALLBACK_URL || `${process.env.BASE_URL || 'https://kilimalll.onrender.com'}/api/payments/webhook`;
+    const callbackUrl = process.env.PAYHERO_CALLBACK_URL ||
+      `${process.env.BASE_URL || 'https://kilimalll.onrender.com'}/api/payments/webhook`;
+    const channelId = parseInt(process.env.PAYHERO_CHANNEL_ID || '1', 10);
 
     let checkoutReference = `STK-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-    let checkoutUrl = null;
 
-    // 2. Call PayHero API if live credentials are configured
-    if (payheroApiKey && payheroApiKey !== 'replace_with_payhero_api_key') {
+    // 2. Call PayHero via SDK (if credentials are configured)
+    const client = await getPayHeroClient();
+    if (client) {
       try {
-        const authHeader = 'Basic ' + Buffer.from(`${payheroUsername}:${payheroPassword}`).toString('base64');
-        const payheroRes = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': authHeader,
-          },
-          body: JSON.stringify({
-            amount: parseFloat(order.total_amount),
-            phone_number: formattedPhone,
-            channel_id: 1, // PayHero M-Pesa STK push channel
-            provider: 'm-pesa',
-            external_reference: order.order_number,
-            callback_url: callbackUrl,
-          }),
+        const stkResponse = await client.stkPush({
+          phone_number: formattedPhone,
+          amount: parseFloat(order.total_amount),
+          provider: 'm-pesa',
+          channel_id: channelId,
+          external_reference: order.order_number,
+          callback_url: callbackUrl,
         });
 
-        const payheroData = await payheroRes.json();
-        if (payheroRes.ok && payheroData.success) {
-          checkoutReference = payheroData.reference || payheroData.checkout_id || checkoutReference;
-          checkoutUrl = payheroData.redirect_url || null;
-        } else {
-          console.warn('PayHero API Warning:', payheroData);
+        if (stkResponse && stkResponse.reference) {
+          checkoutReference = stkResponse.reference;
+        } else if (stkResponse && stkResponse.CheckoutRequestID) {
+          checkoutReference = stkResponse.CheckoutRequestID;
         }
-      } catch (payheroErr) {
-        console.error('PayHero connection error:', payheroErr.message);
-        // Fallback to simulated STK push reference for sandbox/resilience
+      } catch (stkErr) {
+        // Non-fatal: log and fall back to the generated sandbox reference
+        console.error('STK push error:', stkErr.message);
       }
     }
 
-    // 3. Update Order record with internal reference
+    // 3. Persist reference to order record
     await pool.query(
       `UPDATE orders 
-       SET payhero_reference = $1, payhero_checkout_url = $2, updated_at = NOW() 
-       WHERE id = $3`,
-      [checkoutReference, checkoutUrl, order.id]
+       SET payhero_reference = $1, updated_at = NOW() 
+       WHERE id = $2`,
+      [checkoutReference, order.id]
     );
 
-    // Rule A11: Return response without referencing internal vendor names in keys
+    // Rule A11: Response must never expose internal vendor name "PayHero"
     res.json({
       message: 'M-Pesa STK push initiated. Please check your phone and enter your M-Pesa PIN.',
       order_id: order.id,
@@ -116,24 +133,28 @@ router.post('/payments/initiate', authenticate, async (req, res, next) => {
   }
 });
 
-// ── POST /api/payments/webhook (Callback from Payment Gateway) ──────────────
+// ── POST /api/payments/webhook (Callback from Payment Gateway) ───────────────
 router.post('/payments/webhook', async (req, res) => {
   try {
     const payload = req.body || {};
     console.log('Payment Webhook Received:', JSON.stringify(payload));
 
-    // Extract fields from PayHero payload structure or generic callback format
+    // Normalise across flat and nested payload shapes
     const responseData = payload.response || payload;
     const externalReference = responseData.external_reference || responseData.order_number || payload.external_reference;
     const checkoutReference = responseData.reference || responseData.checkout_id || payload.reference;
-    const isSuccess = responseData.status === 'SUCCESS' || responseData.success === true || payload.status === 'SUCCESS' || payload.success === true;
+    const isSuccess =
+      responseData.status === 'SUCCESS' ||
+      responseData.success === true ||
+      payload.status === 'SUCCESS' ||
+      payload.success === true;
     const mpesaReceipt = responseData.MpesaReceiptNumber || responseData.receipt || payload.mpesa_receipt;
 
     if (!externalReference && !checkoutReference) {
       return res.status(400).json({ error: 'Missing order reference in webhook payload' });
     }
 
-    // Find corresponding order
+    // Find corresponding order by external_reference then payhero_reference
     let orderRes;
     if (externalReference) {
       orderRes = await pool.query(`SELECT * FROM orders WHERE order_number = $1`, [externalReference]);
@@ -150,16 +171,14 @@ router.post('/payments/webhook', async (req, res) => {
     const order = orderRes.rows[0];
 
     if (isSuccess) {
-      // Transition order to paid
       await pool.query(
         `UPDATE orders 
          SET status = 'paid', payment_status = 'paid', updated_at = NOW() 
          WHERE id = $1`,
         [order.id]
       );
-      console.log(`Order ${order.order_number} marked as PAID via M-Pesa. Receipt: ${mpesaReceipt || 'N/A'}`);
+      console.log(`Order ${order.order_number} marked as PAID. Receipt: ${mpesaReceipt || 'N/A'}`);
     } else {
-      // Transition payment_status to failed
       await pool.query(
         `UPDATE orders 
          SET payment_status = 'failed', updated_at = NOW() 
@@ -176,7 +195,7 @@ router.post('/payments/webhook', async (req, res) => {
   }
 });
 
-// ── GET /api/payments/status/:order_id (Payment Status Check) ───────────────
+// ── GET /api/payments/status/:order_id (Payment Status Check) ────────────────
 router.get('/payments/status/:order_id', authenticate, async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -198,10 +217,11 @@ router.get('/payments/status/:order_id', authenticate, async (req, res, next) =>
 
     const order = orderRes.rows[0];
 
+    // Rule A11: Surface "M-Pesa" to the user, never the internal gateway name
     res.json({
       order_id: order.id,
       order_number: order.order_number,
-      payment_method: 'M-Pesa', // Rule A11: Use M-Pesa for user display
+      payment_method: 'M-Pesa',
       payment_status: order.payment_status,
       order_status: order.status,
       amount: order.total_amount,

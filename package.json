@@ -19,6 +19,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
+    "payhero-devkit": "^1.1.1",
     "pg": "^8.12.0",
     "resend": "^6.30.0",
     "zod": "^4.6.5"
