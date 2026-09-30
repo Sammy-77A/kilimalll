@@ -440,6 +440,21 @@ Please perform the following verification steps on the live Render environment:
 - `GET https://kilimalll.onrender.com/api/search-keywords/hot`: Returns HTTP 200 top hot search keywords with search counters.
 - `GET https://kilimalll.onrender.com/api/products/featured`: Returns HTTP 200 featured homepage products sorted by sales volume and rating score.
 
+### Phase 6 — Cart API (Executed 2026-09-30)
+
+#### Code Changes
+- `server/routes/cart.js`: Created cart endpoints `GET /api/cart`, `POST /api/cart/items`, `PUT /api/cart/items/:id`, `DELETE /api/cart/items/:id`, and `POST /api/cart/merge`.
+- `server/index.js`: Mounted `/api` cart routes (`/api/cart`).
+- `server/tests/cart.test.js`: Created 8 integration tests covering initial empty state, adding items, quantity incrementing, update item quantity, item deletion, guest cart merging, and auth protection.
+
+#### Live Verification Summary
+- Deployed commit `c9d9041` to Render (Deploy ID: `dep-dauomr7f3r2c7383a0s0`, Status: `live`).
+- `GET https://kilimalll.onrender.com/api/cart` (unauthenticated): Returns HTTP 401 Unauthorized with missing Authorization header error message.
+- `GET https://kilimalll.onrender.com/api/cart` (authenticated): Returns HTTP 200 with user cart object, item count, and subtotal.
+- `POST https://kilimalll.onrender.com/api/cart/items`: Returns HTTP 201 Created with newly created cart item object.
+- `PUT https://kilimalll.onrender.com/api/cart/items/:id`: Returns HTTP 200 OK with updated quantity.
+- `DELETE https://kilimalll.onrender.com/api/cart/items/:id`: Returns HTTP 200 OK with deletion confirmation message.
+
 ---
 
 ## Render Deployment Failure Investigation
