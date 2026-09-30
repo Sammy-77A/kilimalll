@@ -61,7 +61,7 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 3 — Authentication API & Ping Endpoint
-**Status:** `AWAITING USER VERIFICATION`
+**Status:** `APPROVED`
 
 - [x] 3.1 — `GET /api/ping` (lightweight, zero-DB, zero-auth ping endpoint)
 - [x] 3.2 — `POST /api/auth/register`
@@ -76,14 +76,14 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 4 — Product Catalog API
-**Status:** `NOT STARTED`
+**Status:** `AWAITING USER VERIFICATION`
 
-- [ ] 4.1 — `GET /api/categories`
-- [ ] 4.2 — `GET /api/products` (list, filter, sort, paginate)
-- [ ] 4.3 — `GET /api/products/:id`
-- [ ] 4.4 — `GET /api/search?q=`
-- [ ] 4.5 — Full-text search indexes
-- [ ] 4.6 — Integration tests
+- [x] 4.1 — `GET /api/categories`
+- [x] 4.2 — `GET /api/products` (list, filter, sort, paginate)
+- [x] 4.3 — `GET /api/products/:id` (id or slug lookup, with images, skus, flash sale)
+- [x] 4.4 — `GET /api/search?q=`
+- [x] 4.5 — Full-text search indexes & hot keywords tracking
+- [x] 4.6 — Integration tests: categories, product listing, detail, search
 
 ---
 
@@ -361,9 +361,9 @@ Please perform the following verification steps on the live Render environment:
 
 | Field | Value |
 |-------|-------|
-| Status | `AWAITING USER VERIFICATION` |
+| Status | `APPROVED` |
 | Start Date | 2026-10-01 |
-| Approval Date | — |
+| Approval Date | 2026-10-01 |
 | GitHub Branch | `main` |
 | GitHub Commit SHA | `cf27b9e` |
 | Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
@@ -385,6 +385,25 @@ Please perform the following verification steps on the live Render environment:
 - `GET https://kilimalll.onrender.com/api/ping`: Returns HTTP 200 `OK` (zero DB/auth overhead).
 - `POST https://kilimalll.onrender.com/api/auth/register`: Successfully creates customer account and issues JWT tokens.
 - `GET https://kilimalll.onrender.com/api/auth/me`: Successfully returns profile when Bearer JWT is passed; returns 401 when unauthenticated.
+
+---
+
+### Phase 4 — Product Catalog API
+
+| Field | Value |
+|-------|-------|
+| Status | `AWAITING USER VERIFICATION` |
+| Start Date | 2026-10-01 |
+| Approval Date | — |
+| GitHub Branch | `main` |
+| GitHub Commit SHA | Pending deployment |
+| Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
+| Deployment URL | `https://kilimalll.onrender.com` |
+
+#### Files Changed
+- `server/routes/products.js`: Implemented `/api/categories`, `/api/products`, `/api/products/:id`, and `/api/search` routes with pagination, filtering, and sorting.
+- `server/index.js`: Mounted `/api` product routes.
+- `server/tests/products.test.js`: Created integration tests for categories tree, product filtering/sorting, detail fetching, and product search.
 
 ---
 
