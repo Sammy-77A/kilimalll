@@ -455,6 +455,21 @@ Please perform the following verification steps on the live Render environment:
 - `PUT https://kilimalll.onrender.com/api/cart/items/:id`: Returns HTTP 200 OK with updated quantity.
 - `DELETE https://kilimalll.onrender.com/api/cart/items/:id`: Returns HTTP 200 OK with deletion confirmation message.
 
+### Phase 7 — Order & Checkout API (Executed 2026-09-30)
+
+#### Code Changes
+- `server/routes/orders.js`: Created order & checkout endpoints `POST /api/orders`, `GET /api/orders`, `GET /api/orders/:id`, and `PATCH /api/orders/:id/cancel`.
+- `server/index.js`: Mounted `/api` orders routes (`/api/orders`).
+- `server/tests/orders.test.js`: Created 8 integration tests covering order creation from cart, direct buy-now, stock validation, atomic stock decrement in DB transactions, order listing, details lookup, and order cancellation with stock restoration.
+
+#### Live Verification Summary
+- Deployed commit `73c08c3` to Render (Deploy ID: `dep-dauorgs9v7es73bgp760`, Status: `live`).
+- `POST https://kilimalll.onrender.com/api/orders` (unauthenticated): Returns HTTP 401 Unauthorized.
+- `POST https://kilimalll.onrender.com/api/orders` (authenticated): Creates order with atomic stock decrement, generates unique order number, inserts shipping address, clears cart, and returns HTTP 201 Created with full order object.
+- `GET https://kilimalll.onrender.com/api/orders`: Returns HTTP 200 OK with paginated user order list and attached order items.
+- `GET https://kilimalll.onrender.com/api/orders/:id`: Returns HTTP 200 OK with order details, item list, and shipping address object.
+- `PATCH https://kilimalll.onrender.com/api/orders/:id/cancel`: Restores stock to product_skus, sets status to `'cancelled'`, and returns HTTP 200 OK.
+
 ---
 
 ## Render Deployment Failure Investigation
