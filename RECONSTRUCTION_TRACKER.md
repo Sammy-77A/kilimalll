@@ -470,6 +470,20 @@ Please perform the following verification steps on the live Render environment:
 - `GET https://kilimalll.onrender.com/api/orders/:id`: Returns HTTP 200 OK with order details, item list, and shipping address object.
 - `PATCH https://kilimalll.onrender.com/api/orders/:id/cancel`: Restores stock to product_skus, sets status to `'cancelled'`, and returns HTTP 200 OK.
 
+### Phase 8 — Payment Integration (PayHero / M-Pesa) (Executed 2026-09-30)
+
+#### Code Changes
+- `server/routes/payments.js`: Created payment endpoints `POST /api/payments/initiate` (M-Pesa STK push), `POST /api/payments/webhook` (gateway callback), and `GET /api/payments/status/:order_id`.
+- `server/index.js`: Mounted `/api` payments routes (`/api/payments`).
+- `server/tests/payments.test.js`: Created 6 integration tests verifying STK push initiation, payment status check, webhook success callback (`status: 'paid'`), webhook failure callback (`payment_status: 'failed'`), and strict Rule A11 enforcement ("PayHero" string never returned in user-facing JSON output).
+
+#### Live Verification Summary
+- Deployed commit `a763145` to Render (Deploy ID: `dep-daup085g1s2s73crs24g`, Status: `live`).
+- `POST https://kilimalll.onrender.com/api/payments/initiate` (unauthenticated): Returns HTTP 401 Unauthorized.
+- `POST https://kilimalll.onrender.com/api/payments/initiate` (authenticated): Formats Kenyan phone number (`2547...`), triggers STK push, updates order reference, returns HTTP 200 OK. Rule A11 verified: zero instances of "PayHero" string in response payload.
+- `POST https://kilimalll.onrender.com/api/payments/webhook`: Processes gateway callback, matches order by reference or number, updates order & payment status to `paid` or `failed`, returns HTTP 200 OK.
+- `GET https://kilimalll.onrender.com/api/payments/status/:order_id`: Returns HTTP 200 OK with payment status (`unpaid`, `paid`, `failed`), order status, amount, and payment method (`M-Pesa`).
+
 ---
 
 ## Render Deployment Failure Investigation
