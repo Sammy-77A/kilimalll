@@ -67,6 +67,15 @@ describe('Phase 1 — Foundation & Infrastructure', () => {
     });
   });
 
+  // ── Ping endpoint ──────────────────────────────────────────────────────────
+  describe('GET /api/ping', () => {
+    it('responds with 200 OK and "OK" text', async () => {
+      const res = await request(app).get('/api/ping');
+      expect(res.status).toBe(200);
+      expect(res.text).toBe('OK');
+    });
+  });
+
   // ── Health endpoint — response shape ───────────────────────────────────────
   describe('GET /api/health — response shape', () => {
     it('responds with JSON content-type', async () => {

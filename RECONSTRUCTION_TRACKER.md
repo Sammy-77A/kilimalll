@@ -47,7 +47,7 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 ---
 
 ### Phase 2 — Database Schema
-**Status:** `AWAITING USER VERIFICATION`
+**Status:** `APPROVED`
 
 - [x] 2.1 — Schema: users, addresses, categories
 - [x] 2.2 — Schema: products, product_images, product_skus
@@ -60,18 +60,18 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 
 ---
 
-### Phase 3 — Authentication API
-**Status:** `NOT STARTED`
+### Phase 3 — Authentication API & Ping Endpoint
+**Status:** `AWAITING USER VERIFICATION`
 
-- [ ] 3.1 — `POST /api/auth/register`
-- [ ] 3.2 — `POST /api/auth/login`
-- [ ] 3.3 — `POST /api/auth/logout`
-- [ ] 3.4 — `POST /api/auth/refresh`
-- [ ] 3.5 — `GET /api/auth/me`
-- [ ] 3.6 — Auth middleware (JWT verification)
-- [ ] 3.7 — Zod input validation on all auth endpoints
-- [ ] 3.8 — Unit tests: password hashing, token generation
-- [ ] 3.9 — Integration tests: register → login → refresh → logout
+- [x] 3.1 — `GET /api/ping` (lightweight, zero-DB, zero-auth ping endpoint)
+- [x] 3.2 — `POST /api/auth/register`
+- [x] 3.3 — `POST /api/auth/login`
+- [x] 3.4 — `POST /api/auth/logout`
+- [x] 3.5 — `POST /api/auth/refresh`
+- [x] 3.6 — `GET /api/auth/me`
+- [x] 3.7 — Auth middleware (JWT verification)
+- [x] 3.8 — Zod input validation on all auth endpoints
+- [x] 3.9 — Unit & integration tests: ping, auth flow, JWT tokens
 
 ---
 
@@ -329,11 +329,11 @@ Please perform the following verification steps on the live Render environment:
 
 | Field | Value |
 |-------|-------|
-| Status | `AWAITING USER VERIFICATION` |
+| Status | `APPROVED` |
 | Start Date | 2026-09-30 |
-| Approval Date | — |
+| Approval Date | 2026-10-01 |
 | GitHub Branch | `main` |
-| GitHub Commit SHA | Pending deployment |
+| GitHub Commit SHA | `f50119d` |
 | Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
 | Deployment URL | `https://kilimalll.onrender.com` |
 | DB Engine | Neon PostgreSQL (`delicate-brook-62175600`) |
@@ -354,6 +354,31 @@ Please perform the following verification steps on the live Render environment:
   - `banners`: 3 rows
   - `search_keywords`: 5 rows
 - Updated `render.yaml` `buildCommand` to `"pnpm install"`.
+
+---
+
+### Phase 3 — Authentication API & Ping Endpoint
+
+| Field | Value |
+|-------|-------|
+| Status | `AWAITING USER VERIFICATION` |
+| Start Date | 2026-10-01 |
+| Approval Date | — |
+| GitHub Branch | `main` |
+| GitHub Commit SHA | Pending deployment |
+| Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
+| Deployment URL | `https://kilimalll.onrender.com` |
+| Ping Endpoint URL | `https://kilimalll.onrender.com/api/ping` |
+| Auth Base URL | `https://kilimalll.onrender.com/api/auth` |
+
+#### Files Changed
+- `server/routes/health.js`: Added lightweight `GET /api/ping` route (returns HTTP 200 `OK`).
+- `server/utils/jwt.js`: Created JWT token generator & verifier helpers.
+- `server/middleware/auth.js`: Created Bearer token verification middleware.
+- `server/middleware/validate.js`: Updated Zod issue array parsing.
+- `server/routes/auth.js`: Implemented `register`, `login`, `refresh`, `logout`, `me` endpoints.
+- `server/index.js`: Mounted `/api/auth` route.
+- `server/tests/auth.test.js`: Created integration test suite covering input validation, ping endpoint, and full auth lifecycle.
 
 ---
 

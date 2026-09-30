@@ -2,6 +2,15 @@ const router = require('express').Router();
 const pool = require('../db/pool');
 
 /**
+ * GET /api/ping
+ * Lightweight ping endpoint with zero DB/service overhead for external cron pings.
+ * Responds with 200 OK.
+ */
+router.get('/ping', (_req, res) => {
+  res.status(200).send('OK');
+});
+
+/**
  * GET /api/health
  * Returns server and database liveness status.
  * Used by Render health checks and manual verification.
@@ -29,3 +38,4 @@ router.get('/health', async (req, res) => {
 });
 
 module.exports = router;
+
