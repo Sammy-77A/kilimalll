@@ -365,7 +365,7 @@ Please perform the following verification steps on the live Render environment:
 | Start Date | 2026-10-01 |
 | Approval Date | — |
 | GitHub Branch | `main` |
-| GitHub Commit SHA | Pending deployment |
+| GitHub Commit SHA | `cf27b9e` |
 | Render Service | `kilimalll` (`srv-darf3gh42hec73ag2eq0`) |
 | Deployment URL | `https://kilimalll.onrender.com` |
 | Ping Endpoint URL | `https://kilimalll.onrender.com/api/ping` |
@@ -379,6 +379,12 @@ Please perform the following verification steps on the live Render environment:
 - `server/routes/auth.js`: Implemented `register`, `login`, `refresh`, `logout`, `me` endpoints.
 - `server/index.js`: Mounted `/api/auth` route.
 - `server/tests/auth.test.js`: Created integration test suite covering input validation, ping endpoint, and full auth lifecycle.
+
+#### Live Verification Summary
+- Deployed commit `cf27b9e` to Render.
+- `GET https://kilimalll.onrender.com/api/ping`: Returns HTTP 200 `OK` (zero DB/auth overhead).
+- `POST https://kilimalll.onrender.com/api/auth/register`: Successfully creates customer account and issues JWT tokens.
+- `GET https://kilimalll.onrender.com/api/auth/me`: Successfully returns profile when Bearer JWT is passed; returns 401 when unauthenticated.
 
 ---
 
