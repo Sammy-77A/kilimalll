@@ -51,10 +51,17 @@ describe('Phase 9 — Frontend & Cookie Auth Integration', () => {
     expect(res.text).toContain('kilimall-ui.js');
   });
 
-  it('GET /js/kilimall-ui.js should serve frontend bridge script', async () => {
+  it('GET /search/010616.html should serve search page with kilimall-ui.js injected', async () => {
+    const res = await request(app).get('/search/010616.html');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('kilimall-ui.js');
+  });
+
+  it('GET /js/kilimall-ui.js should serve frontend bridge script with search logic', async () => {
     const res = await request(app).get('/js/kilimall-ui.js');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('enforceKenyaRegion');
+    expect(res.text).toContain('triggerSearch');
+    expect(res.text).toContain('loadSearchPageResults');
   });
 
   it('GET /api/auth/me using HTTP-only cookie should authenticate successfully', async () => {
