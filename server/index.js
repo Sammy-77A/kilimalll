@@ -55,7 +55,16 @@ app.use('/api', require('./routes/cart'));
 app.use('/api', require('./routes/orders'));
 app.use('/api', require('./routes/payments'));
 
-// ── Static Assets (content-addressed — cache aggressively) ───────────────────
+// ── Static Assets ─────────────────────────────────────────────────────────────
+// kilimall-ui.js is actively updated and has no content-hash in its filename.
+// Must be served with no-cache so every deploy takes effect immediately.
+// All other /js files have hashed names so immutable caching is safe for them.
+app.get('/js/kilimall-ui.js', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(PUBLIC_DIR, 'js', 'kilimall-ui.js'));
+});
 app.use('/css',     express.static(path.join(PUBLIC_DIR, 'css'),     { maxAge: '30d', immutable: true }));
 app.use('/js',      express.static(path.join(PUBLIC_DIR, 'js'),      { maxAge: '30d', immutable: true }));
 app.use('/images',  express.static(path.join(PUBLIC_DIR, 'images'),  { maxAge: '30d' }));
