@@ -155,7 +155,9 @@
 
     fetch('/api/search?q=' + encodeURIComponent(query))
       .then(function (res) { if (res.ok) return res.json(); })
-      .then(function (products) { if (products) renderSearchResults(products, query); })
+      .then(function (data) {
+        // API returns { products: [...], pagination: {...} } var products = (data && data.products) ? data.products : (Array.isArray(data) ? data : []);
+        renderSearchResults(products, query); })
       .catch(function (err) { console.warn('Search fetch error:', err); });
   }
 
@@ -179,9 +181,9 @@
 
     // Build cards matching the page native structure: .listing-item > .inner-listing > .product-item
     listingsGrid.innerHTML = products.map(function (p) {
-      var title = esc(p.title || p.name || '');
+      var title = esc(p.name || p.title || '');
       var price = 'KSh ' + Number(p.price || p.min_price || 0).toLocaleString();
-      var img = p.thumbnail || p.image_url || 'images/loading_default.33a46.png';
+      var img = p.main_image_url || p.thumbnail || p.image_url || 'images/loading_default.33a46.png';
       var href = 'listing/' + p.id + '.html';
       return (
         '<div class="listing-item">' +
@@ -231,4 +233,6 @@
   });
 
 })();
+
+
 
