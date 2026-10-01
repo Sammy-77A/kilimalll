@@ -128,10 +128,10 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 - [x] 8.1 — Review PayHero Node.js SDK / REST approach
 - [x] 8.2 — `POST /api/payments/initiate` (STK push)
 - [x] 8.3 — `POST /api/payments/webhook`
-- [ ] 8.4 — Webhook signature verification — **NOT IMPLEMENTED** (corrected 2026-10-02: webhook currently trusts any payload; fix in progress)
+- [ ] 8.4 — Webhook signature verification — **IMPLEMENTED 2026-10-02, awaiting Render verification** (shared-secret token + gateway status lookup; see 2026-10-02 notes). Stays unticked until verified on Render with real gateway credentials.
 - [x] 8.5 — Order status transitions
 - [x] 8.6 — Verify "PayHero" never appears in frontend
-- [x] 8.7 — Sandbox tests (note: STK push falls back to a fake reference when the gateway call fails; being changed to fail loudly in production)
+- [x] 8.7 — Sandbox tests (2026-10-02: fake references now only when `PAYMENTS_SANDBOX=true`; gateway failures return 502 instead of faking success)
 
 ---
 
@@ -206,6 +206,8 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 | R13 | SMS absent | — | AfricasTalking/Twilio | **ON HOLD** — email (Resend) used instead | 🟡 On hold |
 | R14 | Missing backend business logic | CRITICAL | Reconstruct from behaviour | Research + implement own logic; escalate financial/irreversible actions | 🔵 Ongoing |
 | R15 | PayHero name leaking to UI | HIGH (new) | Backend-only reference | Enforced: frontend uses "M-Pesa" only | ✅ Enforced |
+| R16 | Payment webhook unauthenticated (anyone could mark an order paid) | CRITICAL (found 2026-10-02) | Verify callbacks | Token on callback URL + live status lookup against the gateway; amount check; no downgrade of paid orders | 🟡 Fixed in code, needs `PAYHERO_WEBHOOK_TOKEN` on Render + live verification |
+| R17 | Render payments running in sandbox (placeholder gateway password, `PAYMENTS_SANDBOX=true`) | HIGH (found 2026-10-02) | Real credentials | User to supply real PayHero credentials before going live; sandbox flag stays `true` until then | 🔵 Open |
 
 ### Skipped Items
 
@@ -523,6 +525,15 @@ Phases 8 and 9 therefore stay `AWAITING USER VERIFICATION` and are not ready for
 - `public/js/kilimall-ui.js`: search and hot-keyword links now use `/search/010616` (no `.html`).
 - `server/index.js`: `/search/:id` now accepts both `/search/<id>` and `/search/<id>.html`, and only allows alphanumeric ids.
 - `server/tests/frontend.test.js`: tests now assert the real search page is served (byte-for-byte), not the homepage catch-all; verified that the new test fails without the route fix.
+
+**Payment hardening (2026-10-02, local tests pass: 84 passed / 1 intentional skip; Render verification pending):**
+- `server/routes/payments.js` webhook: requires `PAYHERO_WEBHOOK_TOKEN` (`?token=` or `x-webhook-token`, constant-time compare); returns 503 if the token is not configured and 401 if wrong.
+- Live mode: the callback is only used to locate the order. Payment is confirmed by calling the gateway's transaction-status lookup with the reference stored at STK-push time (never one taken from the callback). Sandbox mode (`PAYMENTS_SANDBOX=true`) trusts the token-authenticated payload.
+- Paid orders are never downgraded; success for cancelled/refunded orders is ignored and logged for manual refund; a reported amount differing from the order total is ignored; failure only moves `unpaid` orders.
+- `POST /api/payments/initiate`: the callback URL now carries the token; invalid Kenyan phone numbers return 422; gateway failure returns 502 (no more fake `STK_PUSH_SENT`); production without credentials returns 503. Fake references are issued only in sandbox mode.
+- `server/utils/jwt.js`: in production the server refuses to start without real `JWT_SECRET` / `JWT_REFRESH_SECRET`.
+- Zod 4 validation errors in orders/payments now return `details` (was `undefined`).
+- Render audit (2026-10-02): JWT secrets set; `PAYMENTS_SANDBOX=true`; gateway password is still a placeholder; `PAYHERO_WEBHOOK_TOKEN`, Resend and R2 secrets not set; dashboard health-check path empty. Commit `aa744c4` live.
 
 ---
 

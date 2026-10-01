@@ -1,5 +1,16 @@
 const jwt = require('jsonwebtoken');
 
+// In production the signing secrets must be real. A missing/placeholder secret would
+// silently fall back to a publicly known key, so refuse to start instead.
+if (process.env.NODE_ENV === 'production') {
+  for (const name of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
+    const value = process.env[name];
+    if (!value || value.startsWith('replace_with')) {
+      throw new Error(`${name} must be set to a real secret in production`);
+    }
+  }
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';

@@ -206,7 +206,7 @@ router.post('/orders', authenticate, async (req, res, next) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err instanceof z.ZodError) {
-      return res.status(422).json({ error: 'Validation error', details: err.errors });
+      return res.status(422).json({ error: 'Validation error', details: err.issues });
     }
     next(err);
   } finally {

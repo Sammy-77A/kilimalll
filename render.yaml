@@ -57,3 +57,10 @@ services:
         sync: false
       - key: PAYHERO_CALLBACK_URL
         value: https://kilimalll.onrender.com/api/payments/webhook
+      - key: PAYHERO_CHANNEL_ID
+        sync: false
+      - key: PAYHERO_WEBHOOK_TOKEN
+        sync: false
+      # true = sandbox (gateway never called). Set to false only with real credentials + webhook token.
+      - key: PAYMENTS_SANDBOX
+        value: "true"

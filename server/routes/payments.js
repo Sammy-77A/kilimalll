@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const pool = require('../db/pool');
 const { authenticate } = require('../middleware/auth');
@@ -15,7 +16,7 @@ async function getPayHeroClient() {
   const payheroUsername = process.env.PAYHERO_USERNAME;
   const payheroPassword = process.env.PAYHERO_PASSWORD;
 
-  // Credentials not configured — return null to fall back to sandbox mode
+  // Credentials not configured — return null (callers decide whether that means sandbox or an error)
   if (!payheroUsername || !payheroPassword ||
       payheroPassword === 'replace_with_payhero_password') {
     return null;
@@ -32,6 +33,24 @@ async function getPayHeroClient() {
   }
 }
 
+// Test seam: lets tests inject a fake gateway client (pass null to reset).
+router.__setPayHeroClientForTests = (client) => { _payheroClient = client; };
+
+/**
+ * Decide how payments run.
+ *  - PAYMENTS_SANDBOX=true      → sandbox: the gateway is never called, a fake reference is issued.
+ *  - credentials configured     → live: real STK push, callbacks verified against the gateway.
+ *  - no credentials, non-prod   → sandbox (local development / tests).
+ *  - no credentials, production → unavailable (client null, sandbox false): fail loudly, never fake a payment.
+ */
+async function resolveGateway() {
+  if (process.env.PAYMENTS_SANDBOX === 'true') return { sandbox: true, client: null };
+  const client = await getPayHeroClient();
+  if (client) return { sandbox: false, client };
+  if (process.env.NODE_ENV !== 'production') return { sandbox: true, client: null };
+  return { sandbox: false, client: null };
+}
+
 // ── Helper: Format Kenyan Phone Number to 254XXXXXXXXX ───────────────────────
 function formatKenyanPhone(phone) {
   let cleaned = phone.replace(/\D/g, '');
@@ -41,6 +60,45 @@ function formatKenyanPhone(phone) {
     cleaned = '254' + cleaned;
   }
   return cleaned;
+}
+
+const KENYAN_MOBILE = /^254[17]\d{8}$/;
+
+// ── Helper: callback URL (carries the webhook shared secret) ─────────────────
+// Uses PAYHERO_CALLBACK_URL, else BASE_URL, else the production default. Candidates that are
+// not valid http(s) URLs are skipped so a bad env var can never break payment initiation.
+const DEFAULT_CALLBACK_URL = 'https://kilimalll.onrender.com/api/payments/webhook';
+
+function buildCallbackUrl(token) {
+  const candidates = [
+    process.env.PAYHERO_CALLBACK_URL,
+    process.env.BASE_URL && `${process.env.BASE_URL.replace(/\/+$/, '')}/api/payments/webhook`,
+    DEFAULT_CALLBACK_URL,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const url = new URL(candidate);
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') continue;
+      if (token) url.searchParams.set('token', token);
+      return url.toString();
+    } catch (_err) {
+      console.warn('[payments] Ignoring invalid callback URL candidate');
+    }
+  }
+  return DEFAULT_CALLBACK_URL;
+}
+
+// ── Helper: constant-time token comparison ───────────────────────────────────
+function tokensMatch(provided, expected) {
+  const a = crypto.createHash('sha256').update(String(provided || '')).digest();
+  const b = crypto.createHash('sha256').update(String(expected)).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+// ── Helper: keep phone numbers out of logs ───────────────────────────────────
+function maskPhones(text) {
+  return text.replace(/\b(?:254|0)([17])\d{6}(\d{2})\b/g, (_m, d, tail) => `254${d}XXXXXX${tail}`);
 }
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────────
@@ -55,6 +113,13 @@ router.post('/payments/initiate', authenticate, async (req, res, next) => {
     const validated = initiatePaymentSchema.parse(req.body);
     const userId = req.user.userId;
     const formattedPhone = formatKenyanPhone(validated.phone_number);
+
+    if (!KENYAN_MOBILE.test(formattedPhone)) {
+      return res.status(422).json({
+        error: 'Validation error',
+        details: [{ path: ['phone_number'], message: 'Enter a valid Kenyan M-Pesa number, e.g. 0712345678' }],
+      });
+    }
 
     // 1. Fetch Order
     const orderRes = await pool.query(
@@ -76,15 +141,27 @@ router.post('/payments/initiate', authenticate, async (req, res, next) => {
       return res.status(400).json({ error: 'Cannot initiate payment for a cancelled order' });
     }
 
-    const callbackUrl = process.env.PAYHERO_CALLBACK_URL ||
-      `${process.env.BASE_URL || 'https://kilimalll.onrender.com'}/api/payments/webhook`;
+    const { sandbox, client } = await resolveGateway();
+    const webhookToken = process.env.PAYHERO_WEBHOOK_TOKEN;
+
+    // Live payments need a gateway client AND a webhook token, otherwise the
+    // customer could pay and we would never be able to accept the callback.
+    if (!sandbox && (!client || !webhookToken)) {
+      console.error('[payments] Live payments requested but not configured:',
+        !client ? 'gateway credentials missing' : 'PAYHERO_WEBHOOK_TOKEN missing');
+      return res.status(503).json({ error: 'M-Pesa payments are temporarily unavailable. Please try again later.' });
+    }
+
+    // The callback URL carries the shared secret the webhook route requires.
+    const callbackUrl = buildCallbackUrl(webhookToken);
     const channelId = parseInt(process.env.PAYHERO_CHANNEL_ID || '1', 10);
 
-    let checkoutReference = `STK-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    let checkoutReference;
 
-    // 2. Call PayHero via SDK (if credentials are configured)
-    const client = await getPayHeroClient();
-    if (client) {
+    if (sandbox) {
+      checkoutReference = `STK-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    } else {
+      // 2. Call the gateway via SDK. Any failure is reported to the customer — never faked.
       try {
         const stkResponse = await client.stkPush({
           phone_number: formattedPhone,
@@ -94,22 +171,20 @@ router.post('/payments/initiate', authenticate, async (req, res, next) => {
           external_reference: order.order_number,
           callback_url: callbackUrl,
         });
-
-        if (stkResponse && stkResponse.reference) {
-          checkoutReference = stkResponse.reference;
-        } else if (stkResponse && stkResponse.CheckoutRequestID) {
-          checkoutReference = stkResponse.CheckoutRequestID;
+        checkoutReference = stkResponse && (stkResponse.reference || stkResponse.CheckoutRequestID);
+        if (!checkoutReference || stkResponse.success === false) {
+          throw new Error('Gateway did not accept the STK push request');
         }
       } catch (stkErr) {
-        // Non-fatal: log and fall back to the generated sandbox reference
         console.error('STK push error:', stkErr.message);
+        return res.status(502).json({ error: 'We could not start the M-Pesa payment. Please check the phone number and try again.' });
       }
     }
 
     // 3. Persist reference to order record
     await pool.query(
-      `UPDATE orders 
-       SET payhero_reference = $1, updated_at = NOW() 
+      `UPDATE orders
+       SET payhero_reference = $1, updated_at = NOW()
        WHERE id = $2`,
       [checkoutReference, order.id]
     );
@@ -127,28 +202,57 @@ router.post('/payments/initiate', authenticate, async (req, res, next) => {
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(422).json({ error: 'Validation error', details: err.errors });
+      return res.status(422).json({ error: 'Validation error', details: err.issues });
     }
     next(err);
   }
 });
 
 // ── POST /api/payments/webhook (Callback from Payment Gateway) ───────────────
+// Security model:
+//  1. The caller must present PAYHERO_WEBHOOK_TOKEN (?token= or x-webhook-token header).
+//  2. In live mode the payload is only used to LOCATE the order. Whether it was paid is
+//     decided by asking the gateway about the reference we stored when the STK push
+//     was created, so a forged callback cannot mark anything paid.
+//  3. Paid orders are never downgraded, cancelled orders are never marked paid, and a
+//     reported amount that differs from the order total is ignored.
 router.post('/payments/webhook', async (req, res) => {
   try {
-    const payload = req.body || {};
-    console.log('Payment Webhook Received:', JSON.stringify(payload));
+    const expectedToken = process.env.PAYHERO_WEBHOOK_TOKEN;
+    if (!expectedToken) {
+      console.error('[webhook] PAYHERO_WEBHOOK_TOKEN is not set — rejecting callback');
+      return res.status(503).json({ error: 'Webhook not configured' });
+    }
+    const providedToken = req.query.token || req.get('x-webhook-token');
+    if (!tokensMatch(providedToken, expectedToken)) {
+      console.warn('[webhook] Rejected callback with missing/invalid token');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    // Normalise across flat and nested payload shapes
-    const responseData = payload.response || payload;
-    const externalReference = responseData.external_reference || responseData.order_number || payload.external_reference;
-    const checkoutReference = responseData.reference || responseData.checkout_id || payload.reference;
-    const isSuccess =
-      responseData.status === 'SUCCESS' ||
-      responseData.success === true ||
-      payload.status === 'SUCCESS' ||
-      payload.success === true;
-    const mpesaReceipt = responseData.MpesaReceiptNumber || responseData.receipt || payload.mpesa_receipt;
+    const payload = req.body || {};
+    // Logged (phones masked) so the real callback shape can be confirmed from Render logs.
+    console.log('Payment Webhook Received:', maskPhones(JSON.stringify(payload)));
+
+    // Normalise across flat and nested payload shapes (nested keys take priority).
+    const nested = payload.response && typeof payload.response === 'object' ? payload.response : {};
+    const pick = (...keys) => {
+      for (const source of [nested, payload]) {
+        for (const key of keys) {
+          if (source[key] !== undefined && source[key] !== null && source[key] !== '') return source[key];
+        }
+      }
+      return undefined;
+    };
+
+    const externalReference = pick('external_reference', 'ExternalReference', 'order_number');
+    const checkoutReference = pick('reference', 'checkout_id', 'CheckoutRequestID');
+    const reportedStatus = String(pick('status', 'Status') ?? '').toUpperCase();
+    const reportedSuccess =
+      ['SUCCESS', 'SUCCESSFUL', 'COMPLETED'].includes(reportedStatus) ||
+      pick('success') === true ||
+      String(pick('ResultCode') ?? '') === '0';
+    const reportedAmount = parseFloat(pick('Amount', 'amount'));
+    const mpesaReceipt = pick('MpesaReceiptNumber', 'receipt', 'mpesa_receipt');
 
     if (!externalReference && !checkoutReference) {
       return res.status(400).json({ error: 'Missing order reference in webhook payload' });
@@ -157,10 +261,10 @@ router.post('/payments/webhook', async (req, res) => {
     // Find corresponding order by external_reference then payhero_reference
     let orderRes;
     if (externalReference) {
-      orderRes = await pool.query(`SELECT * FROM orders WHERE order_number = $1`, [externalReference]);
+      orderRes = await pool.query(`SELECT * FROM orders WHERE order_number = $1`, [String(externalReference)]);
     }
     if ((!orderRes || orderRes.rows.length === 0) && checkoutReference) {
-      orderRes = await pool.query(`SELECT * FROM orders WHERE payhero_reference = $1`, [checkoutReference]);
+      orderRes = await pool.query(`SELECT * FROM orders WHERE payhero_reference = $1`, [String(checkoutReference)]);
     }
 
     if (!orderRes || orderRes.rows.length === 0) {
@@ -170,25 +274,73 @@ router.post('/payments/webhook', async (req, res) => {
 
     const order = orderRes.rows[0];
 
-    if (isSuccess) {
+    // Idempotency: a paid order stays paid, whatever arrives later.
+    if (order.payment_status === 'paid') {
+      return res.status(200).json({ received: true, status: 'PAID' });
+    }
+
+    if (Number.isFinite(reportedAmount) &&
+        Math.abs(reportedAmount - parseFloat(order.total_amount)) > 0.01) {
+      console.error(`[webhook] Amount mismatch for ${order.order_number}: reported ${reportedAmount}, expected ${order.total_amount} — ignored`);
+      return res.status(200).json({ received: true, status: 'IGNORED' });
+    }
+
+    // Decide the outcome: sandbox trusts the (token-authenticated) payload; live asks the gateway.
+    const { sandbox, client } = await resolveGateway();
+    let outcome; // 'SUCCESS' | 'FAILED' | 'PENDING'
+
+    if (sandbox) {
+      outcome = reportedSuccess ? 'SUCCESS' : 'FAILED';
+    } else {
+      if (!client) {
+        console.error('[webhook] Live mode but no gateway client — cannot verify callback');
+        return res.status(503).json({ error: 'Payment verification unavailable' });
+      }
+      const storedReference = order.payhero_reference;
+      // Only ever query the gateway with a reference we stored ourselves (the SDK does not escape it).
+      if (!storedReference || !/^[A-Za-z0-9_-]{6,100}$/.test(storedReference)) {
+        console.error(`[webhook] Order ${order.order_number} has no verifiable gateway reference — ignored`);
+        return res.status(200).json({ received: true, status: 'IGNORED' });
+      }
+      let gatewayStatus;
+      try {
+        const result = await client.transactionStatus(storedReference);
+        gatewayStatus = String(result && result.status).toUpperCase();
+      } catch (verifyErr) {
+        console.error('[webhook] Gateway verification failed:', verifyErr.message);
+        return res.status(502).json({ error: 'Could not verify payment with gateway' });
+      }
+      outcome = gatewayStatus === 'SUCCESS' ? 'SUCCESS' : gatewayStatus === 'FAILED' ? 'FAILED' : 'PENDING';
+    }
+
+    if (outcome === 'PENDING') {
+      return res.status(200).json({ received: true, status: 'PENDING' });
+    }
+
+    if (outcome === 'SUCCESS') {
+      if (order.status === 'cancelled' || order.status === 'refunded') {
+        console.error(`[webhook] PAYMENT RECEIVED FOR ${order.status.toUpperCase()} ORDER ${order.order_number} — needs manual refund. Receipt: ${mpesaReceipt || 'N/A'}`);
+        return res.status(200).json({ received: true, status: 'IGNORED' });
+      }
       await pool.query(
-        `UPDATE orders 
-         SET status = 'paid', payment_status = 'paid', updated_at = NOW() 
-         WHERE id = $1`,
+        `UPDATE orders
+         SET status = 'paid', payment_status = 'paid', updated_at = NOW()
+         WHERE id = $1 AND payment_status <> 'paid' AND status NOT IN ('cancelled', 'refunded')`,
         [order.id]
       );
       console.log(`Order ${order.order_number} marked as PAID. Receipt: ${mpesaReceipt || 'N/A'}`);
-    } else {
-      await pool.query(
-        `UPDATE orders 
-         SET payment_status = 'failed', updated_at = NOW() 
-         WHERE id = $1`,
-        [order.id]
-      );
-      console.log(`Order ${order.order_number} payment FAILED.`);
+      return res.status(200).json({ received: true, status: 'PAID' });
     }
 
-    res.status(200).json({ received: true, status: isSuccess ? 'PAID' : 'FAILED' });
+    // FAILED: only an unpaid order can move to failed.
+    await pool.query(
+      `UPDATE orders
+       SET payment_status = 'failed', updated_at = NOW()
+       WHERE id = $1 AND payment_status = 'unpaid'`,
+      [order.id]
+    );
+    console.log(`Order ${order.order_number} payment FAILED.`);
+    return res.status(200).json({ received: true, status: 'FAILED' });
   } catch (err) {
     console.error('Webhook processing error:', err);
     res.status(500).json({ error: 'Webhook processing error' });
@@ -206,7 +358,7 @@ router.get('/payments/status/:order_id', authenticate, async (req, res, next) =>
     }
 
     const orderRes = await pool.query(
-      `SELECT id, order_number, status, payment_status, payment_method, total_amount, currency, updated_at 
+      `SELECT id, order_number, status, payment_status, payment_method, total_amount, currency, updated_at
        FROM orders WHERE id = $1 AND user_id = $2`,
       [orderId, userId]
     );

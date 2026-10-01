@@ -99,8 +99,8 @@ public/                 Scraped static site. Hashed asset names. Don't restyle.
 | POST | /api/orders | ✔ | from `items[]` (buy now) or from the cart. Transactional SKU stock decrement. Clears the cart |
 | GET | /api/orders, /api/orders/:id | ✔ | owner only |
 | PATCH | /api/orders/:id/cancel | ✔ | restores stock |
-| POST | /api/payments/initiate | ✔ | `{ order_id, phone_number }`. Phone normalised to `2547…`. STK push via PayHero SDK, or a sandbox reference if credentials are missing or the call fails |
-| POST | /api/payments/webhook | – | finds the order by `external_reference` (= order_number) or `payhero_reference`. Sets paid or failed |
+| POST | /api/payments/initiate | ✔ | `{ order_id, phone_number }`. Phone must be a Kenyan mobile (422 otherwise). Live: STK push via the PayHero SDK (502 on gateway failure, 503 if not configured). Sandbox (`PAYMENTS_SANDBOX=true`, or no credentials outside production): fake `STK-…` reference |
+| POST | /api/payments/webhook | token | Requires `PAYHERO_WEBHOOK_TOKEN` via `?token=` or `x-webhook-token` (503 if unset, 401 if wrong). Finds the order by `external_reference` (= order_number) or `payhero_reference`. Live: confirms via the gateway's transaction-status lookup using the stored reference. Never downgrades a paid order. Ignores amount mismatches and cancelled orders |
 | GET | /api/payments/status/:order_id | ✔ | always reports `payment_method: 'M-Pesa'` |
 
 Business rules currently in code:
@@ -137,14 +137,27 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 2. ~~Search URL served the homepage~~ **Fixed 2026-10-02**: `/search/:id` now accepts `<id>` and `<id>.html`, and the client uses `/search/010616`. The test now compares the served bytes with `search.010616.html`.
 3. **Open (needs a user decision):** search result cards use relative `listing/<db id>.html` and `images/...` URLs. From `/search/...` these resolve under `/search/`. The `public/listing/*.html` files are named by the ORIGINAL Kilimall ids, not DB ids 1–4. Options: A) import the 9 listings into the DB, B) use one listing page as a template filled from `/api/products/:id`, C) leave cards unclickable. Recommended: B (or A for a real catalogue).
 4. ~~Hot keywords never rendered~~ **Fixed 2026-10-02**: the client now reads `{ keywords }`.
-5. **Open:** `/api/payments/webhook` has **no signature or authenticity check** (tracker 8.4 says it's done). Anyone who knows an order number can mark it paid. The amount is also not compared with `total_amount`. It isn't idempotent, and a failed callback can overwrite an already-paid order.
-6. **Open:** if the STK push fails, `/payments/initiate` still returns `STK_PUSH_SENT` with a fake reference. That hides real failures in production.
+5. ~~Webhook unauthenticated~~ **Fixed in code 2026-10-02** (not yet verified on Render): token + gateway status lookup + amount check + no-downgrade. **Still needed:** set `PAYHERO_WEBHOOK_TOKEN` on Render (until then the webhook returns 503), and confirm the real callback shape from the logs once real payments run. The `Payment Webhook Received:` log line prints the (phone-masked) body for that. The nested-payload field names (`response.Status`, `ExternalReference`, ...) are from memory, not confirmed.
+6. ~~Failed STK push reported as sent~~ **Fixed 2026-10-02**: 502 on gateway failure; fake references only in sandbox mode.
 7. `POST /api/orders` inserts a new address *before* `BEGIN`, so the address is kept even when the order is rolled back (for example, on an empty cart). The client is released correctly in `finally`.
-8. **Open:** JWT secrets silently fall back to hardcoded dev values if the env vars are missing.
+8. ~~JWT secret fallback~~ **Fixed 2026-10-02**: production refuses to start without real secrets (they are set on Render).
 9. No rate limiting (planned for Phase 12, but the tracker says auth limiting was planned for Phase 3). CSP is off.
 10. The unused legacy `server/db/schema.sql` could confuse readers.
 
 ---
+
+## 8b. Render deployment state (audited 2026-10-02, no secret values recorded)
+
+- Service `kilimalll`, free plan, Frankfurt, auto-deploy from `main`. Build `pnpm install`, start `pnpm start`. **Dashboard health-check path is empty** (render.yaml's `/api/health` is ignored). `/api/ping` is hit periodically by cron-job.org.
+- Set: `NODE_ENV=production`, `BASE_URL`, `ALLOWED_ORIGIN`, `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, JWT expiries, `PAYHERO_USERNAME`, `PAYHERO_CHANNEL_ID=841`, `PAYHERO_CALLBACK_URL`, `PAYMENTS_SANDBOX=true`, `EMAIL_FROM`, `R2_BUCKET=kilimalll-assets`.
+- Placeholder/missing: `PAYHERO_PASSWORD` (placeholder, so payments are sandbox), `PAYHERO_WEBHOOK_TOKEN`, `RESEND_API_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL`. `PAYHERO_API_KEY` is unused by the code.
+- To go live with payments: real PayHero username/password/channel id, `PAYHERO_WEBHOOK_TOKEN`, then `PAYMENTS_SANDBOX=false`.
+
+## 8c. Local environment quirks
+
+- The local `.env` has `NODE_ENV=production` and no JWT secrets, so `pnpm start` locally now refuses to start. This is intended; add JWT secrets or set `NODE_ENV=development` to run locally.
+- Vitest forces `NODE_ENV=test` and sets `BASE_URL="/"`, and dotenv never overrides existing variables. Code that reads `BASE_URL` must tolerate that.
+- A Vitest worker sometimes aborts on Windows (exit code 3221226505) at startup, even on unchanged code. Rerun before assuming a regression.
 
 ## 9. Working tips
 
