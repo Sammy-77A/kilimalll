@@ -81,7 +81,10 @@ app.get('/sitemap', (_req, res) =>
   res.sendFile(path.join(PUBLIC_DIR, 'sitemap.html')));
 
 app.get('/search/:id', (req, res, next) => {
-  const file = path.join(PUBLIC_DIR, `search.${req.params.id}.html`);
+  // Accept both /search/010616 and /search/010616.html
+  const id = req.params.id.replace(/\.html$/, '');
+  if (!/^[A-Za-z0-9]+$/.test(id)) return next();
+  const file = path.join(PUBLIC_DIR, `search.${id}.html`);
   res.sendFile(file, (err) => { if (err) next(); });
 });
 

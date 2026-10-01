@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import { createRequire } from 'module';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
 const app = require('../index.js');
+const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public');
 
 describe('Phase 9 — Frontend & Cookie Auth Integration', () => {
   let testUser = {
@@ -51,10 +55,29 @@ describe('Phase 9 — Frontend & Cookie Auth Integration', () => {
     expect(res.text).toContain('kilimall-ui.js');
   });
 
-  it('GET /search/010616.html should serve search page with kilimall-ui.js injected', async () => {
-    const res = await request(app).get('/search/010616.html');
+  // Both URL forms must serve the real search page, not the homepage catch-all.
+  for (const url of ['/search/010616', '/search/010616.html']) {
+    it(`GET ${url} should serve the real search page (not index.html)`, async () => {
+      const res = await request(app).get(url);
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('kilimall-ui.js');
+      const expected = fs.readFileSync(path.join(PUBLIC, 'search.010616.html'), 'utf8');
+      const home = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
+      expect(res.text).toBe(expected);
+      expect(res.text).not.toBe(home);
+    });
+  }
+
+  it('GET /search/does-not-exist falls through to the homepage (catch-all)', async () => {
+    const res = await request(app).get('/search/does-not-exist');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('kilimall-ui.js');
+  });
+
+  it('kilimall-ui.js has no code swallowed by a // comment and reads { keywords }', () => {
+    const src = fs.readFileSync(path.join(PUBLIC, 'js', 'kilimall-ui.js'), 'utf8');
+    expect(src).not.toMatch(/\/\/[^\n]*\bvar products\b/);
+    expect(src).toContain('data.keywords');
+    expect(src).not.toContain('/search/010616.html');
   });
 
   it('GET /js/kilimall-ui.js should serve frontend bridge script with search logic', async () => {

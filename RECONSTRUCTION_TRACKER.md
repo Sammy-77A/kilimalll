@@ -128,10 +128,10 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 - [x] 8.1 — Review PayHero Node.js SDK / REST approach
 - [x] 8.2 — `POST /api/payments/initiate` (STK push)
 - [x] 8.3 — `POST /api/payments/webhook`
-- [x] 8.4 — Webhook signature verification
+- [ ] 8.4 — Webhook signature verification — **NOT IMPLEMENTED** (corrected 2026-10-02: webhook currently trusts any payload; fix in progress)
 - [x] 8.5 — Order status transitions
 - [x] 8.6 — Verify "PayHero" never appears in frontend
-- [x] 8.7 — Sandbox tests
+- [x] 8.7 — Sandbox tests (note: STK push falls back to a fake reference when the gateway call fails; being changed to fail loudly in production)
 
 ---
 
@@ -140,12 +140,12 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 > Gate: existing static UI files reused (`index.html`, `search.*.html`, `listing/*.html`).
 
 - [x] 9.1 — Identify reusable existing UI files (`index.html`, `search.010616.html`, `listing/*.html`)
-- [x] 9.2 — Connect search bar to `/api/search`
-- [x] 9.3 — Connect homepage to CMS APIs (`/api/banners`, `/api/flash-sales`, `/api/search-keywords/hot`, `/api/products/featured`)
-- [x] 9.4 — Connect product listing/detail to Product API (`/api/categories`, `/api/products`, `/api/products/:id`)
-- [x] 9.5 — Connect cart UI to Cart API (`/api/cart`, `/api/cart/items`)
-- [x] 9.6 — Connect checkout/payment UI to Payment API (`/api/orders`, `/api/payments/initiate`)
-- [x] 9.7 — Connect login/register to Auth API (`/api/auth/login`, `/api/auth/register`, `/api/auth/me`)
+- [x] 9.2 — Connect search bar to `/api/search` (search URL and results rendering fixed 2026-10-02)
+- [ ] 9.3 — Connect homepage to CMS APIs (`/api/banners`, `/api/flash-sales`, `/api/search-keywords/hot`, `/api/products/featured`) — **PARTIAL — only hot search keywords wired; banners, flash sales and featured products are not** (corrected 2026-10-02)
+- [ ] 9.4 — Connect product listing/detail to Product API (`/api/categories`, `/api/products`, `/api/products/:id`) — **NOT WIRED in `public/js/kilimall-ui.js`** (corrected 2026-10-02)
+- [ ] 9.5 — Connect cart UI to Cart API (`/api/cart`, `/api/cart/items`) — **PARTIAL — only the cart badge count is wired; add/update/remove is not** (corrected 2026-10-02)
+- [ ] 9.6 — Connect checkout/payment UI to Payment API (`/api/orders`, `/api/payments/initiate`) — **NOT WIRED in `public/js/kilimall-ui.js`** (corrected 2026-10-02)
+- [ ] 9.7 — Connect login/register to Auth API (`/api/auth/login`, `/api/auth/register`, `/api/auth/me`) — **PARTIAL — only the `/api/auth/me` header name is wired; login/register forms are not** (corrected 2026-10-02)
 - [x] 9.8 — Remove region logic; fix `/_nuxt/` 404s; fix `/sw.js` gap
 - [x] 9.9 — Add working service worker (`public/sw.js`)
 - [x] 9.10 — Integration & smoke tests (`server/tests/frontend.test.js` 5/5 pass)
@@ -501,6 +501,28 @@ Please perform the following verification steps on the live Render environment:
 - `GET https://kilimalll.onrender.com/_nuxt/test.js`: Returns HTTP 204 No Content.
 - `GET https://kilimalll.onrender.com/`: Serves static UI with `kilimall-ui.js` script bound to API endpoints.
 - Cookie Auth: `POST /api/auth/login` sets `accessToken` and `refreshToken` in `Set-Cookie` headers, allowing seamless session persistence.
+
+### Tracker Corrections & Fixes — 2026-10-02
+
+An audit of the code found the checklist overstated completion. No history was removed.
+
+| Item | Was | Now | Reason |
+|------|-----|-----|--------|
+| 8.4 | `[x]` | `[ ]` | `POST /api/payments/webhook` has no authentication, amount check or idempotency |
+| 9.3 | `[x]` | `[ ]` partial | Only hot keywords wired in `kilimall-ui.js` |
+| 9.4 | `[x]` | `[ ]` | No product listing/detail wiring |
+| 9.5 | `[x]` | `[ ]` partial | Only cart badge count |
+| 9.6 | `[x]` | `[ ]` | No checkout/payment wiring |
+| 9.7 | `[x]` | `[ ]` partial | Only `/api/auth/me` header name |
+
+Phases 8 and 9 therefore stay `AWAITING USER VERIFICATION` and are not ready for approval.
+
+**Search fixes (Phase 9, local tests pass; Render verification pending):**
+- `public/js/kilimall-ui.js`: restored the `var products` line that a `//` comment had swallowed, so results render again.
+- `public/js/kilimall-ui.js`: hot keywords now read `{ keywords }` from the API (it returned an object, not an array).
+- `public/js/kilimall-ui.js`: search and hot-keyword links now use `/search/010616` (no `.html`).
+- `server/index.js`: `/search/:id` now accepts both `/search/<id>` and `/search/<id>.html`, and only allows alphanumeric ids.
+- `server/tests/frontend.test.js`: tests now assert the real search page is served (byte-for-byte), not the homepage catch-all; verified that the new test fails without the route fix.
 
 ---
 

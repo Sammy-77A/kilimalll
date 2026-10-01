@@ -53,7 +53,7 @@
 
   function triggerSearch(query) {
     var q = (query || '').trim();
-    if (q) window.location.href = '/search/010616.html?q=' + encodeURIComponent(q);
+    if (q) window.location.href = '/search/010616?q=' + encodeURIComponent(q);
   }
 
   function getSearchInput() {
@@ -156,8 +156,10 @@
     fetch('/api/search?q=' + encodeURIComponent(query))
       .then(function (res) { if (res.ok) return res.json(); })
       .then(function (data) {
-        // API returns { products: [...], pagination: {...} } var products = (data && data.products) ? data.products : (Array.isArray(data) ? data : []);
-        renderSearchResults(products, query); })
+        // API returns { products: [...], pagination: {...} }
+        var products = (data && data.products) ? data.products : (Array.isArray(data) ? data : []);
+        renderSearchResults(products, query);
+      })
       .catch(function (err) { console.warn('Search fetch error:', err); });
   }
 
@@ -213,11 +215,13 @@
     if (window.location.pathname !== '/' && window.location.pathname.indexOf('index.html') === -1) return;
     fetch('/api/search-keywords/hot')
       .then(function (res) { if (res.ok) return res.json(); })
-      .then(function (kws) {
-        if (!kws || !kws.length) return;
+      .then(function (data) {
+        // API returns { keywords: [...] }
+        var kws = (data && data.keywords) ? data.keywords : (Array.isArray(data) ? data : []);
+        if (!kws.length) return;
         var c = document.querySelector('.hot-words, .search-keywords, .hot-keys');
         if (c) c.innerHTML = kws.map(function (k) {
-          return '<a href="/search/010616.html?q=' + encodeURIComponent(k.keyword) + '" style="margin-right:12px;color:#666;font-size:13px;">' + esc(k.keyword) + '</a>';
+          return '<a href="/search/010616?q=' + encodeURIComponent(k.keyword) + '" style="margin-right:12px;color:#666;font-size:13px;">' + esc(k.keyword) + '</a>';
         }).join('');
       })
       .catch(function () {});
