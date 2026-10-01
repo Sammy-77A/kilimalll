@@ -10,6 +10,13 @@ const {
   verifyRefreshToken,
 } = require('../utils/jwt');
 
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/',
+};
+
 // ── Validation Schemas ───────────────────────────────────────────────────────
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -24,7 +31,7 @@ const loginSchema = z.object({
 });
 
 const refreshSchema = z.object({
-  refreshToken: z.string().min(1, 'Refresh token is required'),
+  refreshToken: z.string().min(1, 'Refresh token is required').optional(),
 });
 
 // ── Endpoints ────────────────────────────────────────────────────────────────
@@ -53,6 +60,9 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
     const payload = { userId: user.id, email: user.email, role: user.role };
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
+
+    res.cookie('accessToken', accessToken, { ...COOKIE_OPTIONS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...COOKIE_OPTIONS, maxAge: 7 * 24 * 60 * 60 * 1000 });
 
     res.status(201).json({
       message: 'Registration successful',
@@ -92,6 +102,9 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
+    res.cookie('accessToken', accessToken, { ...COOKIE_OPTIONS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...COOKIE_OPTIONS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
     res.json({
       message: 'Login successful',
       user,
@@ -108,12 +121,19 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
  * Exchange valid refresh token for a new access token.
  */
 router.post('/refresh', validate(refreshSchema), async (req, res) => {
-  const { refreshToken } = req.body;
+  const tokenToVerify = req.body.refreshToken || req.cookies?.refreshToken;
+  if (!tokenToVerify) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Refresh token is required' });
+  }
+
   try {
-    const decoded = verifyRefreshToken(refreshToken);
+    const decoded = verifyRefreshToken(tokenToVerify);
     const payload = { userId: decoded.userId, email: decoded.email, role: decoded.role };
     const newAccessToken = generateAccessToken(payload);
     const newRefreshToken = generateRefreshToken(payload);
+
+    res.cookie('accessToken', newAccessToken, { ...COOKIE_OPTIONS, maxAge: 15 * 60 * 1000 });
+    res.cookie('refreshToken', newRefreshToken, { ...COOKIE_OPTIONS, maxAge: 7 * 24 * 60 * 60 * 1000 });
 
     res.json({
       accessToken: newAccessToken,
@@ -126,9 +146,11 @@ router.post('/refresh', validate(refreshSchema), async (req, res) => {
 
 /**
  * POST /api/auth/logout
- * Client logout (stateless JWT invalidation signal).
+ * Client logout (stateless JWT invalidation signal & clear cookies).
  */
 router.post('/logout', (_req, res) => {
+  res.clearCookie('accessToken', { path: '/' });
+  res.clearCookie('refreshToken', { path: '/' });
   res.json({ message: 'Logout successful' });
 });
 
