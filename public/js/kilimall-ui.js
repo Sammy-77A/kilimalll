@@ -160,32 +160,46 @@
   }
 
   function renderSearchResults(products, query) {
-    var container = document.querySelector('.result-wrapper, .result-listings-wrapper, .product-list-wrapper, .wap-div');
-    if (!container) return;
-    var grid = container.querySelector('.result-listings, .product-list, .goods-list');
-    if (!grid) {
-      var wrap = container.querySelector('.result-listings-wrapper') || container;
-      if (!container.querySelector('.result-listings-wrapper')) {
-        wrap = document.createElement('div');
-        wrap.className = 'result-listings-wrapper';
-        container.appendChild(wrap);
-      }
-      grid = document.createElement('div');
-      grid.className = 'result-listings';
-      grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:16px;padding:16px;background:#fff;border-radius:8px;margin-top:16px;';
-      wrap.appendChild(grid);
+    // The search page already has a styled .listings grid — populate it directly.
+    var listingsGrid = document.querySelector('.listings');
+    if (!listingsGrid) {
+      // Fallback: create our own container inside result-listings-wrapper
+      var wrapper = document.querySelector('.result-listings-wrapper, .result-wrapper, .wap-div');
+      if (!wrapper) return;
+      listingsGrid = document.createElement('div');
+      listingsGrid.className = 'listings';
+      listingsGrid.style.cssText = 'display:flex;flex-wrap:wrap;';
+      wrapper.insertBefore(listingsGrid, wrapper.firstChild);
     }
+
     if (!products || !products.length) {
-      grid.innerHTML = '<div style="padding:40px;text-align:center;width:100%;font-size:16px;color:#666;">No products found for "<strong>' + esc(query) + '</strong>".</div>';
+      listingsGrid.innerHTML = '<div class="no-data" style="padding:40px;text-align:center;width:100%;font-size:16px;color:#666;">No products found for "<strong>' + esc(query) + '</strong>".</div>';
       return;
     }
-    grid.innerHTML = products.map(function (p) {
-      return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:12px;width:220px;box-shadow:0 2px 4px rgba(0,0,0,.05);">' +
-        '<a href="/listing/' + p.id + '.html" style="text-decoration:none;color:inherit;">' +
-        '<img src="' + (p.thumbnail || p.image_url || 'images/loading_default.33a46.png') + '" alt="' + esc(p.title || p.name) + '" style="width:100%;height:180px;object-fit:contain;">' +
-        '<h4 style="font-size:14px;margin:8px 0;overflow:hidden;line-height:1.4;">' + esc(p.title || p.name) + '</h4>' +
-        '<div style="color:#dd3131;font-weight:bold;">KSh ' + Number(p.price || p.min_price || 0).toLocaleString() + '</div>' +
-        '</a></div>';
+
+    // Build cards matching the page native structure: .listing-item > .inner-listing > .product-item
+    listingsGrid.innerHTML = products.map(function (p) {
+      var title = esc(p.title || p.name || '');
+      var price = 'KSh ' + Number(p.price || p.min_price || 0).toLocaleString();
+      var img = p.thumbnail || p.image_url || 'images/loading_default.33a46.png';
+      var href = 'listing/' + p.id + '.html';
+      return (
+        '<div class="listing-item">' +
+          '<div class="inner-listing">' +
+            '<div class="product-item">' +
+              '<a href="' + href + '" target="_blank">' +
+                '<div class="product-image">' +
+                  '<img src="' + img + '" alt="' + title + '" style="width:100%;height:180px;object-fit:contain;">' +
+                '</div>' +
+                '<div class="info-box">' +
+                  '<p class="product-title">' + title + '</p>' +
+                  '<div class="product-price" style="text-align:left;">' + price + '</div>' +
+                '</div>' +
+              '</a>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
     }).join('');
   }
 
@@ -217,3 +231,4 @@
   });
 
 })();
+
