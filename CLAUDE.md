@@ -146,7 +146,7 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 5. ~~Webhook unauthenticated~~ **Fixed in code 2026-10-02** (not yet verified on Render): token + gateway status lookup + amount check + no-downgrade. **Still needed:** set `PAYHERO_WEBHOOK_TOKEN` on Render (until then the webhook returns 503), and confirm the real callback shape from the logs once real payments run. The `Payment Webhook Received:` log line prints the (phone-masked) body for that. The nested-payload field names (`response.Status`, `ExternalReference`, ...) are from memory, not confirmed.
 6. ~~Failed STK push reported as sent~~ **Fixed 2026-10-02**: 502 on gateway failure; fake references only in sandbox mode.
 7. `POST /api/orders` inserts a new address *before* `BEGIN`, so the address is kept even when the order is rolled back (for example, on an empty cart). The client is released correctly in `finally`.
-8. ~~JWT secret fallback~~ **Fixed 2026-10-02**: production refuses to start without real secrets (they are set on Render).
+8. **JWT secrets: code fixed, Render still needs real values.** Production now refuses to start without real secrets. A deploy audit on 2026-10-02 found that on Render `JWT_SECRET` and `JWT_REFRESH_SECRET` are still the `.env.example` placeholders (`replace_with_...`), so the live site (commit `aa744c4`) has been signing tokens with publicly known strings (tokens can be forged). Commits `954404b` and later cannot deploy until real random secrets are set in the Render dashboard. Changing them logs everyone out once.
 9. No rate limiting (planned for Phase 12, but the tracker says auth limiting was planned for Phase 3). CSP is off.
 10. The unused legacy `server/db/schema.sql` could confuse readers.
 
@@ -157,7 +157,7 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 - **Add to Cart / Buy Now / favourite / share on `/product/:ref` are inert** (no handlers). Cart + checkout wiring (tracker 9.5/9.6) is the next step. `window.__kmSelectedSku` and `window.__kmQuantity` already hold the chosen variant and quantity for it.
 - **Import placeholders:** every imported variant has `stock = 50` and the product price (the pages carry neither). `seller_name` is the column default ("Kilimall Direct"). Individual reviews were not imported (`reviews.user_id` is NOT NULL). The page's "Limited Offer" banner is hidden (no flash-sale data; flash prices are not applied at checkout).
 - **Images:** 40 imported image URLs still point at kilimall.com (`img.` / `image.`) because those files were never saved locally (affects the earbuds, purse, handbag, glasses, HDMI adapter pages). Decide whether to download and host them (R2 secrets are not set on Render).
-- **Fictional seed data is still live:** the 4 invented seed products (ids 1-4, e.g. "Infinix Hot 30" at KSh 18,499) and 7 seed categories appear in search and listings next to the real ones. Tests depend on product id 1, so remove/deactivate them deliberately.
+- **Fictional seed data is still live (user decided on 2026-10-02 to leave it, along with the hotlinked images):** the 4 invented seed products (ids 1-4, e.g. "Infinix Hot 30" at KSh 18,499) and 7 seed categories appear in search and listings next to the real ones. Tests depend on product id 1, so remove/deactivate them deliberately.
 - **Category tree depth:** products are attached to their second-level category (the API exposes a two-level tree); the original third level (e.g. "Smart Phones") is dropped.
 - **Shipping rule mismatch:** the original pages show KES 99 shipping; our orders charge KES 150 (free from KES 5000). Needs a business decision.
 - **Price mismatch between snapshots:** the homepage card for Sanosan Care Oil says KSh 950 while its product page says KSh 760 (was 1,170). The product page value was imported.
@@ -168,8 +168,8 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 ## 8b. Render deployment state (audited 2026-10-02, no secret values recorded)
 
 - Service `kilimalll`, free plan, Frankfurt, auto-deploy from `main`. Build `pnpm install`, start `pnpm start`. **Dashboard health-check path is empty** (render.yaml's `/api/health` is ignored). `/api/ping` is hit periodically by cron-job.org.
-- Set: `NODE_ENV=production`, `BASE_URL`, `ALLOWED_ORIGIN`, `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, JWT expiries, `PAYHERO_USERNAME`, `PAYHERO_CHANNEL_ID=841`, `PAYHERO_CALLBACK_URL`, `PAYMENTS_SANDBOX=true`, `EMAIL_FROM`, `R2_BUCKET=kilimalll-assets`.
-- Placeholder/missing: `PAYHERO_PASSWORD` (placeholder, so payments are sandbox), `PAYHERO_WEBHOOK_TOKEN`, `RESEND_API_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL`. `PAYHERO_API_KEY` is unused by the code.
+- Set: `NODE_ENV=production`, `BASE_URL`, `ALLOWED_ORIGIN`, `DATABASE_URL`, JWT expiries, `PAYHERO_USERNAME`, `PAYHERO_CHANNEL_ID=841`, `PAYHERO_CALLBACK_URL`, `PAYMENTS_SANDBOX=true`, `EMAIL_FROM`, `R2_BUCKET=kilimalll-assets`.
+- Placeholder/missing: **`JWT_SECRET` and `JWT_REFRESH_SECRET` (placeholders, see issue 8)**, `PAYHERO_PASSWORD` (placeholder, so payments are sandbox), `PAYHERO_WEBHOOK_TOKEN`, `RESEND_API_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_URL`. `PAYHERO_API_KEY` is unused by the code.
 - To go live with payments: real PayHero username/password/channel id, `PAYHERO_WEBHOOK_TOKEN`, then `PAYMENTS_SANDBOX=false`.
 
 ## 8c. Local environment quirks

@@ -207,6 +207,7 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 | R14 | Missing backend business logic | CRITICAL | Reconstruct from behaviour | Research + implement own logic; escalate financial/irreversible actions | 🔵 Ongoing |
 | R15 | PayHero name leaking to UI | HIGH (new) | Backend-only reference | Enforced: frontend uses "M-Pesa" only | ✅ Enforced |
 | R16 | Payment webhook unauthenticated (anyone could mark an order paid) | CRITICAL (found 2026-10-02) | Verify callbacks | Token on callback URL + live status lookup against the gateway; amount check; no downgrade of paid orders | 🟡 Fixed in code, needs `PAYHERO_WEBHOOK_TOKEN` on Render + live verification |
+| R18 | Render `JWT_SECRET` / `JWT_REFRESH_SECRET` are the template placeholders; live tokens can be forged | CRITICAL (found 2026-10-02) | Real secrets | Startup check added (commit `954404b`) which correctly blocked the deploy; user to set real random secrets in the Render dashboard (logs everyone out once) | 🔴 Open until secrets are set |
 | R17 | Render payments running in sandbox (placeholder gateway password, `PAYMENTS_SANDBOX=true`) | HIGH (found 2026-10-02) | Real credentials | User to supply real PayHero credentials before going live; sandbox flag stays `true` until then | 🔵 Open |
 
 ### Skipped Items
@@ -533,7 +534,7 @@ Phases 8 and 9 therefore stay `AWAITING USER VERIFICATION` and are not ready for
 - `POST /api/payments/initiate`: the callback URL now carries the token; invalid Kenyan phone numbers return 422; gateway failure returns 502 (no more fake `STK_PUSH_SENT`); production without credentials returns 503. Fake references are issued only in sandbox mode.
 - `server/utils/jwt.js`: in production the server refuses to start without real `JWT_SECRET` / `JWT_REFRESH_SECRET`.
 - Zod 4 validation errors in orders/payments now return `details` (was `undefined`).
-- Render audit (2026-10-02): JWT secrets set; `PAYMENTS_SANDBOX=true`; gateway password is still a placeholder; `PAYHERO_WEBHOOK_TOKEN`, Resend and R2 secrets not set; dashboard health-check path empty. Commit `aa744c4` live.
+- Render audit (2026-10-02, corrected): JWT secrets are still the `.env.example` placeholders (live deploy `aa744c4` signs tokens with a known string; `954404b` deploy failed at startup on the new check, so `aa744c4` stayed live); `PAYMENTS_SANDBOX=true`; gateway password is still a placeholder; `PAYHERO_WEBHOOK_TOKEN`, Resend and R2 secrets not set; dashboard health-check path empty. Commit `aa744c4` live.
 
 **Product pages and catalogue import (2026-10-02, local tests pass: 98 passed / 1 intentional skip; Render verification pending):**
 - `public/js/kilimall-ui.js`/`server/index.js`: saved pages are now served from the site root (`/search.<id>.html`, `/sitemap.html`, `/downloadApp.html`); `/search/<id>` redirects. This corrects the earlier search fix, which served the page at `/search/<id>` where its relative CSS/JS 404'd (rendered half-styled). Verified in headless Edge before/after.
