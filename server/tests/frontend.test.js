@@ -55,18 +55,58 @@ describe('Phase 9 — Frontend & Cookie Auth Integration', () => {
     expect(res.text).toContain('kilimall-ui.js');
   });
 
-  // Both URL forms must serve the real search page, not the homepage catch-all.
+  // Search pages use relative asset URLs, so they must be served from the root as search.<id>.html.
+  it('GET /search.010616.html serves the real search page byte-for-byte (not index.html)', async () => {
+    const res = await request(app).get('/search.010616.html');
+    expect(res.status).toBe(200);
+    const expected = fs.readFileSync(path.join(PUBLIC, 'search.010616.html'), 'utf8');
+    const home = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
+    expect(res.text).toBe(expected);
+    expect(res.text).not.toBe(home);
+    expect(res.text).toContain('kilimall-ui.js');
+  });
+
   for (const url of ['/search/010616', '/search/010616.html']) {
-    it(`GET ${url} should serve the real search page (not index.html)`, async () => {
-      const res = await request(app).get(url);
-      expect(res.status).toBe(200);
-      expect(res.text).toContain('kilimall-ui.js');
-      const expected = fs.readFileSync(path.join(PUBLIC, 'search.010616.html'), 'utf8');
-      const home = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
-      expect(res.text).toBe(expected);
-      expect(res.text).not.toBe(home);
+    it(`GET ${url}?q=tecno redirects to the root page and keeps the query`, async () => {
+      const res = await request(app).get(`${url}?q=tecno`).redirects(0);
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('/search.010616.html?q=tecno');
     });
   }
+
+  it('every saved search.<id>.html linked from the homepage serves its own page; unsaved ones fall back to the homepage', async () => {
+    const home = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
+    const links = [...new Set([...home.matchAll(/href="(search\.[A-Za-z0-9]+\.html)"/g)].map((m) => m[1]))];
+    const saved = links.filter((l) => fs.existsSync(path.join(PUBLIC, l)));
+    // 39 of the 62 category links were never saved in the snapshot (known content gap).
+    expect(saved.length).toBeGreaterThanOrEqual(23);
+    for (const link of saved) {
+      const res = await request(app).get(`/${link}`);
+      expect(res.status).toBe(200);
+      expect(res.text).toBe(fs.readFileSync(path.join(PUBLIC, link), 'utf8'));
+    }
+    const unsaved = links.find((l) => !fs.existsSync(path.join(PUBLIC, l)));
+    if (unsaved) {
+      const res = await request(app).get(`/${unsaved}`);
+      expect(res.status).toBe(200);
+      expect(res.text).toBe(home);
+    }
+  });
+
+  it('the stylesheets and scripts a search page references resolve from its served URL', async () => {
+    const page = fs.readFileSync(path.join(PUBLIC, 'search.010616.html'), 'utf8');
+    const assets = [
+      ...[...page.matchAll(/<link[^>]*rel="stylesheet"[^>]*href="((?:css)\/[^"]+)"/g)].map((m) => [m[1], /css/]),
+      ...[...page.matchAll(/<script[^>]*src="((?:js)\/[^"]+)"/g)].map((m) => [m[1], /javascript/]),
+    ];
+    expect(assets.length).toBeGreaterThan(5);
+    for (const [asset, type] of assets) {
+      // Relative to /search.010616.html the browser requests /<asset>
+      const res = await request(app).get(`/${asset}`);
+      expect(res.status, asset).toBe(200);
+      expect(res.headers['content-type'], asset).toMatch(type);
+    }
+  });
 
   it('GET /search/does-not-exist falls through to the homepage (catch-all)', async () => {
     const res = await request(app).get('/search/does-not-exist');
@@ -77,7 +117,8 @@ describe('Phase 9 — Frontend & Cookie Auth Integration', () => {
     const src = fs.readFileSync(path.join(PUBLIC, 'js', 'kilimall-ui.js'), 'utf8');
     expect(src).not.toMatch(/\/\/[^\n]*\bvar products\b/);
     expect(src).toContain('data.keywords');
-    expect(src).not.toContain('/search/010616.html');
+    expect(src).toContain('/search.010616.html?q=');
+    expect(src).not.toContain('/search/010616');
   });
 
   it('GET /js/kilimall-ui.js should serve frontend bridge script with search logic', async () => {

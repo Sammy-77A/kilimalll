@@ -53,7 +53,7 @@
 
   function triggerSearch(query) {
     var q = (query || '').trim();
-    if (q) window.location.href = '/search/010616?q=' + encodeURIComponent(q);
+    if (q) window.location.href = '/search.010616.html?q=' + encodeURIComponent(q);
   }
 
   function getSearchInput() {
@@ -221,7 +221,7 @@
         if (!kws.length) return;
         var c = document.querySelector('.hot-words, .search-keywords, .hot-keys');
         if (c) c.innerHTML = kws.map(function (k) {
-          return '<a href="/search/010616?q=' + encodeURIComponent(k.keyword) + '" style="margin-right:12px;color:#666;font-size:13px;">' + esc(k.keyword) + '</a>';
+          return '<a href="/search.010616.html?q=' + encodeURIComponent(k.keyword) + '" style="margin-right:12px;color:#666;font-size:13px;">' + esc(k.keyword) + '</a>';
         }).join('');
       })
       .catch(function () {});

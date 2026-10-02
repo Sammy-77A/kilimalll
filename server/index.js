@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const compression = require('compression');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -80,12 +81,24 @@ app.get('/download', (_req, res) =>
 app.get('/sitemap', (_req, res) =>
   res.sendFile(path.join(PUBLIC_DIR, 'sitemap.html')));
 
+// The saved pages use RELATIVE asset URLs (css/..., js/..., images/..., search.<id>.html,
+// sitemap.html), so they only render correctly when served from the site root, at the
+// same path they were saved under.
+const ROOT_PAGES = new Set(['downloadApp.html', 'sitemap.html']);
+app.get(/^\/(search\.[A-Za-z0-9]+\.html|downloadApp\.html|sitemap\.html)$/, (req, res, next) => {
+  const name = req.params[0];
+  if (!name.startsWith('search.') && !ROOT_PAGES.has(name)) return next();
+  res.sendFile(path.join(PUBLIC_DIR, name), (err) => { if (err) next(); });
+});
+
+// Legacy form /search/<id>[.html][?q=...] redirects to the root page (query string preserved).
 app.get('/search/:id', (req, res, next) => {
-  // Accept both /search/010616 and /search/010616.html
   const id = req.params.id.replace(/\.html$/, '');
   if (!/^[A-Za-z0-9]+$/.test(id)) return next();
-  const file = path.join(PUBLIC_DIR, `search.${id}.html`);
-  res.sendFile(file, (err) => { if (err) next(); });
+  if (!fs.existsSync(path.join(PUBLIC_DIR, `search.${id}.html`))) return next();
+  const queryIndex = req.originalUrl.indexOf('?');
+  const query = queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
+  res.redirect(302, `/search.${id}.html${query}`);
 });
 
 // ── SPA Catch-All ─────────────────────────────────────────────────────────────
