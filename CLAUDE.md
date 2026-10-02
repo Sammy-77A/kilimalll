@@ -44,21 +44,23 @@ server/
   index.js              Express app. Middleware order, route mounting, static serving, SPA catch-all. Exports `app` for supertest.
   db/pool.js            pg Pool (max 5, TLS verify on, 10s connect timeout)
   db/migrate.js         Runs migrations/*.sql in filename order, tracked in `_migrations`
-  db/migrations/        001_bootstrap (no-op), 002_schema (13 tables), 003_seed (Kenya seed data)
+  db/migrations/        001_bootstrap (no-op), 002_schema (13 tables), 003_seed (Kenya seed data),
+                        004_import_saved_listings + 005_label_imported_sku_specs (GENERATED, see scripts/extract-listings.js)
   db/schema.sql         LEGACY pre-reconstruction schema. Not used, don't edit. Superseded by 002.
   middleware/auth.js    `authenticate`: JWT from `accessToken` cookie OR `Authorization: Bearer`. Sets req.user = { userId, email, role }
   middleware/validate.js `validate(zodSchema)`: returns 422 { error, errors:[{field,message}] }
   middleware/errorHandler.js  500 handler (hides the message in production)
   utils/jwt.js          access (15m) / refresh (7d) sign + verify
-  routes/               health, auth, cms, products, cart, orders, payments
+  routes/               health, auth, cms, products, cart, orders, payments, product-page (HTML: /product/:ref, /listing redirects)
   tests/                one test file per phase + frontend.test.js
 scripts/
+  extract-listings.js   Reads public/listing/*.html (JSON-LD + markup) and GENERATES migrations 004 and 005. Re-run it instead of editing those SQL files.
   inject-ui-script.js   Adds <script src="/js/kilimall-ui.js" defer> before </body> in public/*.html (top level only, not listing/)
   upload-to-r2.js       Uploads public/{images,fonts,listing} to the R2 bucket
 public/                 Scraped static site. Hashed asset names. Don't restyle.
   index.html            Homepage
   search.<hash>.html    23 search/category pages (links in index.html point to `search.xxxx.html`)
-  listing/*.html        9 product detail pages, named by the ORIGINAL Kilimall product id + slug (not our DB ids)
+  listing/*.html        9 saved product pages, named by the ORIGINAL Kilimall id + slug. They are now (a) the source for the DB import and (b) the markup TEMPLATE (10006105583.html) for /product/:ref. /listing/<file> redirects to /product/<id>.
   help-center/, downloadApp.html, sitemap.html
   js/kilimall-ui.js     OUR frontend bridge (the only hand-written frontend JS). Served with no-cache.
   sw.js                 Minimal service worker (precaches / and 2 CSS files, no fetch handling)
@@ -73,7 +75,11 @@ public/                 Scraped static site. Hashed asset names. Don't restyle.
 2. `/sw.js` → file. `/_nuxt/*` → 204 (silences the old Nuxt preload 404s)
 3. API routers, all under `/api`: health → `/api/auth` → cms → products → cart → orders → payments. **cms is mounted before products**, so `/api/products/featured` matches before `/api/products/:id`.
 4. Static: `/css`, `/js` (immutable 30d), `/images`, `/fonts`, `/assets`, `/listing`, `/help-center`
-5. Pages: `/download`, `/sitemap`, `/search/:id` → `public/search.<id>.html` (falls through to next() if missing)
+5. Pages (the saved HTML uses RELATIVE asset URLs, so pages must be served from the site root at their saved name):
+   `/search.<id>.html`, `/sitemap.html`, `/downloadApp.html` → the file (falls through if missing). `/download` and `/sitemap` are aliases.
+   `/search/<id>[.html]?q=…` → 302 to `/search.<id>.html?q=…`.
+   `/product/:ref` (id or slug) → template page with `window.__KM_PRODUCT__` injected, filled client-side by `kilimall-ui.js` (404 if unknown).
+   `/listing/<origId>[-slug].html` → 302 to `/product/<id>` when `kl-<origId>` is imported, else the static saved page.
 6. `*` → `index.html` (SPA catch-all, so any unknown path returns the homepage with status 200)
 
 ## 5. API surface
@@ -134,8 +140,8 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 ## 8. Known issues found during analysis
 
 1. ~~Search results never rendered~~ **Fixed 2026-10-02** (not yet committed): the `var products` line had been swallowed by a `//` comment.
-2. ~~Search URL served the homepage~~ **Fixed 2026-10-02**: `/search/:id` now accepts `<id>` and `<id>.html`, and the client uses `/search/010616`. The test now compares the served bytes with `search.010616.html`.
-3. **Open (needs a user decision):** search result cards use relative `listing/<db id>.html` and `images/...` URLs. From `/search/...` these resolve under `/search/`. The `public/listing/*.html` files are named by the ORIGINAL Kilimall ids, not DB ids 1–4. Options: A) import the 9 listings into the DB, B) use one listing page as a template filled from `/api/products/:id`, C) leave cards unclickable. Recommended: B (or A for a real catalogue).
+2. ~~Search URL served the homepage~~ **Fixed 2026-10-02** (second fix the same day: serving at `/search/<id>` broke the page's relative CSS/JS, so pages are now served at the root as `/search.<id>.html`; `/search/<id>` redirects). The test now compares the served bytes with `search.010616.html`.
+3. ~~Result cards linked to the wrong place~~ **Fixed 2026-10-02**: cards link to `/product/<id>`; the 9 saved listings were imported into the DB (slug `kl-<original id>`).
 4. ~~Hot keywords never rendered~~ **Fixed 2026-10-02**: the client now reads `{ keywords }`.
 5. ~~Webhook unauthenticated~~ **Fixed in code 2026-10-02** (not yet verified on Render): token + gateway status lookup + amount check + no-downgrade. **Still needed:** set `PAYHERO_WEBHOOK_TOKEN` on Render (until then the webhook returns 503), and confirm the real callback shape from the logs once real payments run. The `Payment Webhook Received:` log line prints the (phone-masked) body for that. The nested-payload field names (`response.Status`, `ExternalReference`, ...) are from memory, not confirmed.
 6. ~~Failed STK push reported as sent~~ **Fixed 2026-10-02**: 502 on gateway failure; fake references only in sandbox mode.
@@ -145,6 +151,19 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 10. The unused legacy `server/db/schema.sql` could confuse readers.
 
 ---
+
+## 8a. Open follow-ups (found 2026-10-02, not fixed)
+
+- **Add to Cart / Buy Now / favourite / share on `/product/:ref` are inert** (no handlers). Cart + checkout wiring (tracker 9.5/9.6) is the next step. `window.__kmSelectedSku` and `window.__kmQuantity` already hold the chosen variant and quantity for it.
+- **Import placeholders:** every imported variant has `stock = 50` and the product price (the pages carry neither). `seller_name` is the column default ("Kilimall Direct"). Individual reviews were not imported (`reviews.user_id` is NOT NULL). The page's "Limited Offer" banner is hidden (no flash-sale data; flash prices are not applied at checkout).
+- **Images:** 40 imported image URLs still point at kilimall.com (`img.` / `image.`) because those files were never saved locally (affects the earbuds, purse, handbag, glasses, HDMI adapter pages). Decide whether to download and host them (R2 secrets are not set on Render).
+- **Fictional seed data is still live:** the 4 invented seed products (ids 1-4, e.g. "Infinix Hot 30" at KSh 18,499) and 7 seed categories appear in search and listings next to the real ones. Tests depend on product id 1, so remove/deactivate them deliberately.
+- **Category tree depth:** products are attached to their second-level category (the API exposes a two-level tree); the original third level (e.g. "Smart Phones") is dropped.
+- **Shipping rule mismatch:** the original pages show KES 99 shipping; our orders charge KES 150 (free from KES 5000). Needs a business decision.
+- **Price mismatch between snapshots:** the homepage card for Sanosan Care Oil says KSh 950 while its product page says KSh 760 (was 1,170). The product page value was imported.
+- **Search page leftovers:** the saved header text ("10000 results for GLD 1/278"), the sidebar filters and pagination are original static markup, not driven by the API.
+- **39 of the homepage's 62 category links have no saved page** and fall back to the homepage.
+- **Product page extras:** the Reviews/Recommend tabs, "Store Selective" and "You May Also Like" sections, and the second "Loading..." box are original static markup and do nothing.
 
 ## 8b. Render deployment state (audited 2026-10-02, no secret values recorded)
 
@@ -157,6 +176,8 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 
 - The local `.env` has `NODE_ENV=production` and no JWT secrets, so `pnpm start` locally now refuses to start. This is intended; add JWT secrets or set `NODE_ENV=development` to run locally.
 - Vitest forces `NODE_ENV=test` and sets `BASE_URL="/"`, and dotenv never overrides existing variables. Code that reads `BASE_URL` must tolerate that.
+- Headless Edge (`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe --headless=new --screenshot=… <url>`) works for visual checks; for click tests, drive it over the DevTools protocol with `--remote-debugging-port` (Node 24 has a global `WebSocket`).
+- The imported listings come from `node scripts/extract-listings.js`; migrations 004/005 were applied to the (shared) Neon database on 2026-10-02. Never hand-edit those SQL files.
 - A Vitest worker sometimes aborts on Windows (exit code 3221226505) at startup, even on unchanged code. Rerun before assuming a regression.
 
 ## 9. Working tips

@@ -142,7 +142,7 @@ Status labels: `NOT STARTED` | `IN PROGRESS` | `AWAITING USER VERIFICATION` | `A
 - [x] 9.1 — Identify reusable existing UI files (`index.html`, `search.010616.html`, `listing/*.html`)
 - [x] 9.2 — Connect search bar to `/api/search` (search URL and results rendering fixed 2026-10-02)
 - [ ] 9.3 — Connect homepage to CMS APIs (`/api/banners`, `/api/flash-sales`, `/api/search-keywords/hot`, `/api/products/featured`) — **PARTIAL — only hot search keywords wired; banners, flash sales and featured products are not** (corrected 2026-10-02)
-- [ ] 9.4 — Connect product listing/detail to Product API (`/api/categories`, `/api/products`, `/api/products/:id`) — **NOT WIRED in `public/js/kilimall-ui.js`** (corrected 2026-10-02)
+- [ ] 9.4 — Connect product listing/detail to Product API (`/api/categories`, `/api/products`, `/api/products/:id`) — **PARTIAL**: product detail page (`/product/:ref`, saved page used as template, no new UI) and search-result links done 2026-10-02; category listing pages (`search.<id>.html`) still show saved static content
 - [ ] 9.5 — Connect cart UI to Cart API (`/api/cart`, `/api/cart/items`) — **PARTIAL — only the cart badge count is wired; add/update/remove is not** (corrected 2026-10-02)
 - [ ] 9.6 — Connect checkout/payment UI to Payment API (`/api/orders`, `/api/payments/initiate`) — **NOT WIRED in `public/js/kilimall-ui.js`** (corrected 2026-10-02)
 - [ ] 9.7 — Connect login/register to Auth API (`/api/auth/login`, `/api/auth/register`, `/api/auth/me`) — **PARTIAL — only the `/api/auth/me` header name is wired; login/register forms are not** (corrected 2026-10-02)
@@ -534,6 +534,14 @@ Phases 8 and 9 therefore stay `AWAITING USER VERIFICATION` and are not ready for
 - `server/utils/jwt.js`: in production the server refuses to start without real `JWT_SECRET` / `JWT_REFRESH_SECRET`.
 - Zod 4 validation errors in orders/payments now return `details` (was `undefined`).
 - Render audit (2026-10-02): JWT secrets set; `PAYMENTS_SANDBOX=true`; gateway password is still a placeholder; `PAYHERO_WEBHOOK_TOKEN`, Resend and R2 secrets not set; dashboard health-check path empty. Commit `aa744c4` live.
+
+**Product pages and catalogue import (2026-10-02, local tests pass: 98 passed / 1 intentional skip; Render verification pending):**
+- `public/js/kilimall-ui.js`/`server/index.js`: saved pages are now served from the site root (`/search.<id>.html`, `/sitemap.html`, `/downloadApp.html`); `/search/<id>` redirects. This corrects the earlier search fix, which served the page at `/search/<id>` where its relative CSS/JS 404'd (rendered half-styled). Verified in headless Edge before/after.
+- `scripts/extract-listings.js` + migrations `004`/`005` (applied to Neon): imported the 9 saved listings as products `kl-<original id>` with 12 new categories (real breadcrumb paths), 78 images, 22 variants (labelled "Color: …"). Dry-run in a rolled-back transaction first; idempotent. **Placeholders:** variant stock = 50, variant price = product price.
+- `server/routes/product-page.js`: `/product/:ref` serves a saved listing page as the template with the product injected as `window.__KM_PRODUCT__` (escaped for inline script); `/listing/<file>` redirects to it for imported products.
+- `kilimall-ui.js`: fills title, breadcrumb, rating, price/discount, gallery, variant buttons, description, store; adds thumbnail, variant and quantity interactions (the original Vue app cannot run: its chunks are not in `public/js`). Search result cards link to `/product/<id>`.
+- Verified in headless Edge: layout matches the saved original; thumbnail, variant and quantity clicks work; no script errors. Add to Cart / Buy Now are not wired (9.5/9.6).
+- Open items from this work are listed in CLAUDE.md section 8a (stock placeholders, 40 hotlinked images, fictional seed data still live, shipping rule mismatch, etc.).
 
 ---
 

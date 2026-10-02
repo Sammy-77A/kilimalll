@@ -56,6 +56,9 @@ app.use('/api', require('./routes/cart'));
 app.use('/api', require('./routes/orders'));
 app.use('/api', require('./routes/payments'));
 
+// Product detail pages (/product/:ref) and legacy /listing/<id> redirects — must precede static /listing
+app.use(require('./routes/product-page'));
+
 // ── Static Assets ─────────────────────────────────────────────────────────────
 // kilimall-ui.js is actively updated and has no content-hash in its filename.
 // Must be served with no-cache so every deploy takes effect immediately.
