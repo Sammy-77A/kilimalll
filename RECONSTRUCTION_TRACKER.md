@@ -541,6 +541,7 @@ Phases 8 and 9 therefore stay `AWAITING USER VERIFICATION` and are not ready for
 - `scripts/extract-listings.js` + migrations `004`/`005` (applied to Neon): imported the 9 saved listings as products `kl-<original id>` with 12 new categories (real breadcrumb paths), 78 images, 22 variants (labelled "Color: …"). Dry-run in a rolled-back transaction first; idempotent. **Placeholders:** variant stock = 50, variant price = product price.
 - `server/routes/product-page.js`: `/product/:ref` serves a saved listing page as the template with the product injected as `window.__KM_PRODUCT__` (escaped for inline script); `/listing/<file>` redirects to it for imported products.
 - `kilimall-ui.js`: fills title, breadcrumb, rating, price/discount, gallery, variant buttons, description, store; adds thumbnail, variant and quantity interactions (the original Vue app cannot run: its chunks are not in `public/js`). Search result cards link to `/product/<id>`.
+- Search results (`/search.<id>.html?q=`): cards are clones of the page's own saved card (native look, 4-5 per row), static rating/badges stripped. Found because the first live check showed results stacked in one column.
 - Verified in headless Edge: layout matches the saved original; thumbnail, variant and quantity clicks work; no script errors. Add to Cart / Buy Now are not wired (9.5/9.6).
 - Open items from this work are listed in CLAUDE.md section 8a (stock placeholders, 40 hotlinked images, fictional seed data still live, shipping rule mismatch, etc.).
 

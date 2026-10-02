@@ -176,12 +176,43 @@
       wrapper.insertBefore(listingsGrid, wrapper.firstChild);
     }
 
+    // The page's own flex rule for .listings is scoped to a different component, so apply the layout here:
+    // cards keep the page's width:20% and flow five per row.
+    listingsGrid.style.display = 'flex';
+    listingsGrid.style.flexWrap = 'wrap';
+    listingsGrid.style.alignItems = 'flex-start';
+
+    // Reuse one of the page's own saved product cards as the prototype, so the page's scoped
+    // (data-v-*) card styles apply and results look native. Captured before the grid is cleared.
+    var proto = listingsGrid.querySelector('.listing-item');
+    proto = proto ? proto.cloneNode(true) : null;
+    var protoUsable = !!(proto && proto.querySelector('a') && proto.querySelector('.product-image img') &&
+      proto.querySelector('.product-title') && proto.querySelector('.product-price'));
+
     if (!products || !products.length) {
       listingsGrid.innerHTML = '<div class="no-data" style="padding:40px;text-align:center;width:100%;font-size:16px;color:#666;">No products found for "<strong>' + esc(query) + '</strong>".</div>';
       return;
     }
 
-    // Build cards matching the page native structure: .listing-item > .inner-listing > .product-item
+    if (protoUsable) {
+      listingsGrid.innerHTML = '';
+      products.forEach(function (p) {
+        var card = proto.cloneNode(true);
+        card.querySelector('a').setAttribute('href', '/product/' + p.id);
+        var img = card.querySelector('.product-image img');
+        img.setAttribute('src', p.main_image_url || p.thumbnail || p.image_url || '/images/loading_default.33a46.png');
+        img.setAttribute('alt', p.name || '');
+        img.setAttribute('lazy', 'loaded');
+        card.querySelector('.product-title').textContent = p.name || '';
+        card.querySelector('.product-price').textContent = 'KSh ' + Number(p.price || 0).toLocaleString('en-US');
+        // The saved card's static star rating and "Brand Official" / "Fulfilled" badges are not facts about this product.
+        qsa('.rate, .mark-box', card).forEach(removeNode);
+        listingsGrid.appendChild(card);
+      });
+      return;
+    }
+
+    // Fallback (no saved card to copy): build cards matching the page's native structure.
     listingsGrid.innerHTML = products.map(function (p) {
       var title = esc(p.name || p.title || '');
       var price = 'KSh ' + Number(p.price || p.min_price || 0).toLocaleString();

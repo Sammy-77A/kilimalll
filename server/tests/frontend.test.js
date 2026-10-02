@@ -121,6 +121,18 @@ describe('Phase 9 — Frontend & Cookie Auth Integration', () => {
     expect(src).not.toContain('/search/010616');
   });
 
+  it('search results are built by cloning the page\'s own saved card, without its static badges', () => {
+    const src = fs.readFileSync(path.join(PUBLIC, 'js', 'kilimall-ui.js'), 'utf8');
+    expect(src).toContain("querySelector('.listing-item')");      // prototype = a saved native card
+    expect(src).toContain("qsa('.rate, .mark-box', card)");       // static stars/"Brand Official" badges removed
+    expect(src).toContain("style.flexWrap = 'wrap'");             // the page's flex rule is scoped elsewhere
+    // the saved card really has the elements the clone relies on
+    const page = fs.readFileSync(path.join(PUBLIC, 'search.010616.html'), 'utf8');
+    for (const cls of ['product-image', 'product-title', 'product-price', 'mark-box']) {
+      expect(page, cls).toContain(`class="${cls}`);
+    }
+  });
+
   it('GET /js/kilimall-ui.js should serve frontend bridge script with search logic', async () => {
     const res = await request(app).get('/js/kilimall-ui.js');
     expect(res.status).toBe(200);

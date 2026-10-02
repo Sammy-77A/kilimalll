@@ -161,6 +161,7 @@ Note: the tracker's section B marks 9.3–9.7 as done, but `kilimall-ui.js` curr
 - **Category tree depth:** products are attached to their second-level category (the API exposes a two-level tree); the original third level (e.g. "Smart Phones") is dropped.
 - **Shipping rule mismatch:** the original pages show KES 99 shipping; our orders charge KES 150 (free from KES 5000). Needs a business decision.
 - **Price mismatch between snapshots:** the homepage card for Sanosan Care Oil says KSh 950 while its product page says KSh 760 (was 1,170). The product page value was imported.
+- **Search result cards** are clones of one of the page's own saved cards (so the scoped `data-v-*` styles apply), with the static star rating and "Brand Official"/"Fulfilled" badges removed. The grid container needs `display:flex` applied in JS because the page's rule is scoped to another component.
 - **Search page leftovers:** the saved header text ("10000 results for GLD 1/278"), the sidebar filters and pagination are original static markup, not driven by the API.
 - **39 of the homepage's 62 category links have no saved page** and fall back to the homepage.
 - **Product page extras:** the Reviews/Recommend tabs, "Store Selective" and "You May Also Like" sections, and the second "Loading..." box are original static markup and do nothing.
